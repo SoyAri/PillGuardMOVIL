@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Button, TextInput, View, Text, Alert } from 'react-native';
+import { StyleSheet, Button, TextInput, View, Text, Alert, Image, TouchableOpacity, StatusBar } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
@@ -39,29 +39,61 @@ export default function AskPersonalDataScreen() {
     }
   };
 
+  const validateName = (text: string) => {
+    const nameRegex = /^[a-zA-Z\s]*$/;
+    return nameRegex.test(text);
+  };
+
+  const validateAge = (text: string) => {
+    const ageRegex = /^[0-9]*$/;
+    return ageRegex.test(text);
+  };
+
+  const validateHeight = (text: string) => {
+    const heightRegex = /^[0-9]*$/;
+    return heightRegex.test(text);
+  };
+
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <Image source={require('../assets/images/personaldataimg.png')} style={styles.image} />
       <Text style={styles.title}>Datos Personales</Text>
       <TextInput
         placeholder="Nombre"
         value={name}
-        onChangeText={setName}
+        onChangeText={(text) => {
+          if (validateName(text)) {
+            setName(text);
+          }
+        }}
         style={styles.input}
+        placeholderTextColor="#ccc"
       />
       <TextInput
         placeholder="Apellidos"
         value={lastname}
-        onChangeText={setLastname}
+        onChangeText={(text) => {
+          if (validateName(text)) {
+            setLastname(text);
+          }
+        }}
         style={styles.input}
+        placeholderTextColor="#ccc"
       />
       <TextInput
         placeholder="Edad"
         value={age}
-        onChangeText={setAge}
+        onChangeText={(text) => {
+          if (validateAge(text)) {
+            setAge(text);
+          }
+        }}
         style={styles.input}
+        placeholderTextColor="#ccc"
         keyboardType="numeric"
       />
-      <Text>Género</Text>
+      <Text style={styles.label}>Género</Text>
       <Picker
         selectedValue={gender}
         style={styles.picker}
@@ -73,11 +105,18 @@ export default function AskPersonalDataScreen() {
       <TextInput
         placeholder="Estatura (cm)"
         value={height}
-        onChangeText={setHeight}
+        onChangeText={(text) => {
+          if (validateHeight(text)) {
+            setHeight(text);
+          }
+        }}
         style={styles.input}
+        placeholderTextColor="#ccc"
         keyboardType="numeric"
       />
-      <Button title="Guardar" onPress={handleSave} />
+      <TouchableOpacity style={styles.button} onPress={handleSave}>
+        <Text style={styles.buttonText}>Guardar</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -88,23 +127,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    backgroundColor: '#212c39',
+  },
+  image: {
+    width: 200,
+    height: 200,
+    marginBottom: 16,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 24,
+    color: '#fff',
+  },
+  label: {
+    fontSize: 16,
+    color: '#fff',
+    marginBottom: 8,
   },
   input: {
     height: 40,
-    borderColor: 'gray',
+    borderColor: '#555', // Cambiar el color del borde a gris oscuro
     borderWidth: 1,
     marginBottom: 12,
     paddingHorizontal: 8,
     width: '100%',
+    borderRadius: 8,
+    backgroundColor: '#333', // Cambiar el color de fondo a gris oscuro
+    color: '#fff', // Cambiar el color del texto a blanco
   },
   picker: {
     height: 50,
     width: '100%',
     marginBottom: 12,
+    color: '#fff', // Cambiar el color del texto a blanco
+    backgroundColor: '#333', // Cambiar el color de fondo a gris oscuro
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
