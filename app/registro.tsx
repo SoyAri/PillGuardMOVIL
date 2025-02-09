@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     color: '#fff', // Cambiar el color del texto a blanco
   },
   errorText: {
-    color: 'red',
+    color: '#ff4b4b',
     marginBottom: 12,
   },
   button: {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Image, SafeAreaView, StatusBar, Platform, Button } from 'react-native';
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, getDoc, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
+import { getFirestore, collection, query, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore";
 import { app } from '../firebaseConfig'; // Ruta corregida
 import { useRouter } from 'expo-router'; // Importa el hook de navegación
 
@@ -13,6 +13,7 @@ export default function HomeScreen() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
   const [nextMedication, setNextMedication] = useState(null);
+  const [nextMedicationNotes, setNextMedicationNotes] = useState(null);
   const router = useRouter(); // Usa el hook de navegación
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function HomeScreen() {
           if (!querySnapshot.empty) {
             const nextPill = querySnapshot.docs[0].data();
             setNextMedication(nextPill.name); // Solo guarda el nombre de la próxima pastilla
+            setNextMedicationNotes(nextPill.notes || null); // Guarda la nota de la próxima pastilla si existe
           } else {
             console.warn("No se encontraron pastillas.");
           }
@@ -90,6 +92,9 @@ export default function HomeScreen() {
       {nextMedication && (
         <View style={styles.nextMedication}>
           <Text style={styles.nextMedicationText}>Próxima medicación: {nextMedication}</Text>
+          {nextMedicationNotes && (
+            <Text style={styles.nextMedicationNotes}>Notas: {nextMedicationNotes}</Text>
+          )}
         </View>
       )}
       <View style={styles.addButtonContainer}>
@@ -144,6 +149,11 @@ const styles = StyleSheet.create({
   nextMedicationText: {
     fontSize: 18,
     color: '#fff',
+  },
+  nextMedicationNotes: {
+    fontSize: 16,
+    color: '#ccc',
+    marginTop: 5,
   },
   addButtonContainer: {
     marginTop: 'auto', // Mueve el botón al final de la pantalla

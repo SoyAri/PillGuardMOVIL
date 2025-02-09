@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { getFirestore, collection, getDocs, updateDoc, doc, addDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, updateDoc, doc, addDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { app } from '../firebaseConfig'; // Ruta corregida
 import { useRouter } from 'expo-router'; // Importa el hook de navegación
@@ -11,6 +11,7 @@ const auth = getAuth(app);
 
 export default function ManagePillsScreen() {
   const [pills, setPills] = useState([]);
+  const [error, setError] = useState('');
   const router = useRouter(); // Usa el hook de navegación
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function ManagePillsScreen() {
         const pillsRef = collection(db, "usersPills", userId, "pills");
         const querySnapshot = await getDocs(pillsRef);
         const pillsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        pillsData.sort((a, b) => a.order - b.order); // Ordenar por el campo 'order'
         setPills(pillsData);
       }
     };
@@ -29,7 +31,8 @@ export default function ManagePillsScreen() {
   }, []);
 
   const addPill = () => {
-    setPills([...pills, { id: null, name: '', interval: '', notes: '' }]);
+    const newOrder = pills.length > 0 ? Math.max(...pills.map(pill => pill.order)) + 1 : 1;
+    setPills([...pills, { id: null, name: '', interval: '', notes: '', order: newOrder }]);
   };
 
   const handleInputChange = (index, field, value) => {
@@ -38,29 +41,81 @@ export default function ManagePillsScreen() {
     setPills(newPills);
   };
 
+  const handleDeletePill = async (index) => {
+    const pillToDelete = pills[index];
+    Alert.alert(
+      "Confirmar eliminación",
+      `¿Estás seguro que quieres borrar ${pillToDelete.name}?`,
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        {
+          text: "Eliminar",
+          onPress: async () => {
+            if (pillToDelete.id) {
+              const user = auth.currentUser;
+              if (user) {
+                const userId = user.uid;
+                const pillDocRef = doc(db, "usersPills", userId, "pills", pillToDelete.id);
+                await deleteDoc(pillDocRef);
+              }
+            }
+            const newPills = pills.filter((_, i) => i !== index);
+            setPills(newPills);
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
   const handleSubmit = async () => {
+    // Verificar que todos los campos estén llenos
+    for (const pill of pills) {
+      if (!pill.name || !pill.interval) {
+        setError('Por favor, llene todos los campos.');
+        return;
+      }
+    }
+
     try {
       const user = auth.currentUser;
       if (user) {
         const userId = user.uid;
-        for (const pill of pills) {
-          if (pill.id) {
-            // Update existing pill
-            const pillDocRef = doc(db, "usersPills", userId, "pills", pill.id);
-            await updateDoc(pillDocRef, {
-              name: pill.name,
-              interval: pill.interval,
-              notes: pill.notes,
-            });
-          } else {
-            // Add new pill
-            await addDoc(collection(db, "usersPills", userId, "pills"), {
-              name: pill.name,
-              interval: pill.interval,
-              notes: pill.notes,
-              timestamp: new Date().getTime() // Añadir timestamp para la próxima medicación
-            });
+        const userDocRef = doc(db, "usersData", userId);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          const userName = userData.name || "Usuario sin nombre";
+
+          for (const pill of pills) {
+            if (pill.id) {
+              // Update existing pill
+              const pillDocRef = doc(db, "usersPills", userId, "pills", pill.id);
+              await updateDoc(pillDocRef, {
+                name: pill.name,
+                interval: pill.interval,
+                notes: pill.notes,
+                userName: userName,
+                order: pill.order
+              });
+            } else {
+              // Add new pill
+              await addDoc(collection(db, "usersPills", userId, "pills"), {
+                name: pill.name,
+                interval: pill.interval,
+                notes: pill.notes,
+                timestamp: new Date().getTime(), // Añadir timestamp para la próxima medicación
+                userName: userName,
+                order: pill.order
+              });
+            }
           }
+        } else {
+          console.warn("No se encontraron datos para el usuario.");
         }
         router.replace('/homeScreen'); // Navega a la pantalla de inicio (home)
       }
@@ -98,8 +153,14 @@ export default function ManagePillsScreen() {
             value={pill.notes}
             onChangeText={(text) => handleInputChange(index, 'notes', text)}
           />
+          {pill.id && (
+            <TouchableOpacity onPress={() => handleDeletePill(index)} style={styles.deleteButton}>
+              <Text style={styles.deleteButtonText}>Eliminar</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ))}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <Button title="Añadir otra pastilla" onPress={addPill} />
       <Button title="Guardar" onPress={handleSubmit} />
     </ScrollView>
@@ -142,5 +203,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#333',
     color: '#fff',
+  },
+  deleteButton: {
+    backgroundColor: '#ff4b4b',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#ff4b4b',
+    marginBottom: 16,
   },
 });

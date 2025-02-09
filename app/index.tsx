@@ -73,7 +73,6 @@ export default function LoginScreen() {
 
           if (docSnap.exists()) {
             // User has personal data, navigate to home screen
-            Alert.alert('Inicio de sesión correcto', `Bienvenido, ${user.email}`);
             router.replace('/homeScreen'); // Navega a la pantalla de inicio (home)
           } else {
             // User does not have personal data, navigate to askpersonaldata screen
