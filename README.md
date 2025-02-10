@@ -1,7 +1,7 @@
 //TO DO:
 1.- Depende el tamaño de la pantalla ciertas cosas como el icono de configuracion se puede desacomodar
 2.- Mantener la sesion abierta aunque cierren la app
-
+3.- Implementar fecha de inicio de medicacion y fecha de finalizacion
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
