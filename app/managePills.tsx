@@ -64,6 +64,7 @@ export default function ManagePillsScreen() {
             }
             const newPills = pills.filter((_, i) => i !== index);
             setPills(newPills);
+            router.replace('/homeScreen')
           },
           style: "destructive"
         }
