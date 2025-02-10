@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "PillGuardAPP",
-    "slug": "PillGuardAPP",
-    "version": "1.0.0",
+    "name": "PillGuard APP",
+    "slug": "PillGuard APP",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/splash.png",
     "scheme": "myapp",

@@ -16,9 +16,15 @@ export default function AskPersonalDataScreen() {
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('Hombre');
   const [height, setHeight] = useState('');
+  const [error, setError] = useState('');
   const router = useRouter(); // Usa el hook de navegación
 
   const handleSave = async () => {
+    if (!name || !lastname || !age || !height) {
+      setError('Por favor, llene todos los campos.');
+      return;
+    }
+
     const user = auth.currentUser;
     if (user) {
       const userId = user.uid;
@@ -114,6 +120,7 @@ export default function AskPersonalDataScreen() {
         placeholderTextColor="#ccc"
         keyboardType="numeric"
       />
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <TouchableOpacity style={styles.button} onPress={handleSave}>
         <Text style={styles.buttonText}>Guardar</Text>
       </TouchableOpacity>
@@ -176,5 +183,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#ff4b4b',
+    marginBottom: 16,
   },
 });
