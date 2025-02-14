@@ -1,25 +1,50 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { getAuth, signOut } from 'firebase/auth';
 import React, { useState } from 'react';
-import { View, Text, Switch, StyleSheet, ScrollView, Button } from 'react-native';
+import { Alert, Button, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { app } from '../firebaseConfig';
 
-export default function SettingsScreen({ navigation }) {
+// Initialize Firebase Auth
+const auth = getAuth(app);
+
+export default function SettingsScreen() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isProtanopia, setIsProtanopia] = useState(false);
   const [isDeuteranopia, setIsDeuteranopia] = useState(false);
   const [isTritanopia, setIsTritanopia] = useState(false);
   const [isMonochromatic, setIsMonochromatic] = useState(false);
   const [isDaltonism, setIsDaltonism] = useState(false);
+  const router = useRouter();
 
   const toggleSwitch = (setter) => (value) => setter(value);
 
-  const applySettings = () => {
-    navigation.navigate('Home', {
-      isDarkMode,
-      isProtanopia,
-      isDeuteranopia,
-      isTritanopia,
-      isMonochromatic,
-      isDaltonism,
-    });
+  const applySettings = async () => {
+    try {
+      await AsyncStorage.multiSet([
+        ['isDarkMode', JSON.stringify(isDarkMode)],
+        ['isProtanopia', JSON.stringify(isProtanopia)],
+        ['isDeuteranopia', JSON.stringify(isDeuteranopia)],
+        ['isTritanopia', JSON.stringify(isTritanopia)],
+        ['isMonochromatic', JSON.stringify(isMonochromatic)],
+        ['isDaltonism', JSON.stringify(isDaltonism)],
+      ]);
+      router.push('/homeScreen');
+    } catch (error) {
+      Alert.alert('Error', 'Hubo un problema al aplicar las configuraciones. Por favor, inténtalo de nuevo.');
+      console.error('Error aplicando configuraciones:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      await AsyncStorage.setItem('isLoggedIn', 'false');
+      router.replace('/');
+    } catch (error) {
+      Alert.alert('Error', 'Hubo un problema al cerrar la sesión. Por favor, inténtalo de nuevo.');
+      console.error('Error cerrando sesión:', error);
+    }
   };
 
   return (
@@ -77,6 +102,11 @@ export default function SettingsScreen({ navigation }) {
       </View>
 
       <Button title="Aplicar Configuraciones" onPress={applySettings} />
+
+      {/* Botón de cierre de sesión */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -112,5 +142,19 @@ const styles = StyleSheet.create({
   settingText: {
     fontSize: 18,
     color: '#fff',
+  },
+  logoutButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 20,
+    width: '100%',
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

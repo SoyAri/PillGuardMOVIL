@@ -80,7 +80,7 @@ export default function LoginScreen() {
       if (isLoggedIn) {
         router.replace('/homeScreen'); 
       } else {
-        router.replace('/'); 
+   // Si no detecta nada no se realizara nada para seguir en el index
       }
     }
   }, [isLoading, isLoggedIn, router]);
