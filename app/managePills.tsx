@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Modal } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 import { getFirestore, collection, getDocs, updateDoc, doc, addDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { app } from '../firebaseConfig'; // Ruta corregida
-import { useRouter } from 'expo-router'; // Importa el hook de navegación
+import { app } from '../firebaseConfig';
+import { useRouter } from 'expo-router';
 
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -12,9 +12,11 @@ const auth = getAuth(app);
 export default function ManagePillsScreen() {
   const [pills, setPills] = useState([]);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false); // Estado para la animación de carga
-  const [deletingIndex, setDeletingIndex] = useState(null); // Estado para la animación de eliminación
-  const router = useRouter(); // Usa el hook de navegación
+  const [loading, setLoading] = useState(false);
+  const [deletingIndex, setDeletingIndex] = useState(null);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [currentPillIndex, setCurrentPillIndex] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchPills = async () => {
@@ -30,7 +32,7 @@ export default function ManagePillsScreen() {
           const pillsRef = collection(db, "usersPills", userName, "pills");
           const querySnapshot = await getDocs(pillsRef);
           const pillsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          pillsData.sort((a, b) => a.order - b.order); // Ordenar por el campo 'order'
+          pillsData.sort((a, b) => a.order - b.order);
           setPills(pillsData);
         } else {
           console.warn("No se encontraron datos para el usuario.");
@@ -43,7 +45,7 @@ export default function ManagePillsScreen() {
 
   const addPill = () => {
     const newOrder = pills.length > 0 ? Math.max(...pills.map(pill => pill.order)) + 1 : 1;
-    setPills([...pills, { id: null, name: '', interval: '', notes: '', order: newOrder }]);
+    setPills([...pills, { id: null, name: '', time: new Date().getTime(), notes: '', startDate: new Date().getTime(), endDate: null, order: newOrder }]);
   };
 
   const handleInputChange = (index, field, value) => {
@@ -65,7 +67,7 @@ export default function ManagePillsScreen() {
         {
           text: "Eliminar",
           onPress: async () => {
-            setDeletingIndex(index); // Mostrar animación de eliminación
+            setDeletingIndex(index);
             try {
               if (pillToDelete.id) {
                 const user = auth.currentUser;
@@ -85,11 +87,11 @@ export default function ManagePillsScreen() {
               const newPills = pills.filter((_, i) => i !== index);
               setPills(newPills);
               Alert.alert('Éxito', 'La píldora se ha eliminado correctamente.');
-              router.replace('/homeScreen'); // Navega a la pantalla de inicio (home)
+              router.replace('/homeScreen');
             } catch (error) {
               console.error("Error eliminando la píldora:", error);
             } finally {
-              setDeletingIndex(null); // Ocultar animación de eliminación
+              setDeletingIndex(null);
             }
           },
           style: "destructive"
@@ -99,15 +101,14 @@ export default function ManagePillsScreen() {
   };
 
   const handleSubmit = async () => {
-    // Verificar que todos los campos estén llenos
     for (const pill of pills) {
-      if (!pill.name || !pill.interval) {
-        setError('Por favor, llene todos los campos.');
+      if (!pill.name || !pill.time) {
+        setError('Por favor, llene todos los campos obligatorios.');
         return;
       }
     }
 
-    setLoading(true); // Mostrar animación de carga
+    setLoading(true);
 
     try {
       const user = auth.currentUser;
@@ -122,36 +123,54 @@ export default function ManagePillsScreen() {
 
           for (const pill of pills) {
             if (pill.id) {
-              // Update existing pill
               const pillDocRef = doc(db, "usersPills", userName, "pills", pill.id);
               await updateDoc(pillDocRef, {
                 name: pill.name,
-                interval: pill.interval,
+                time: pill.time,
                 notes: pill.notes,
+                startDate: pill.startDate,
+                endDate: pill.endDate,
                 order: pill.order
               });
             } else {
-              // Add new pill
-              await addDoc(collection(db, "usersPills", userName, "pills"), {
+              const newPillRef = await addDoc(collection(db, "usersPills", userName, "pills"), {
                 name: pill.name,
-                interval: pill.interval,
+                time: pill.time,
                 notes: pill.notes,
-                timestamp: new Date().getTime(), // Añadir timestamp para la próxima medicación
+                startDate: pill.startDate,
+                endDate: pill.endDate,
+                timestamp: new Date().getTime(),
                 order: pill.order
               });
+
+              if (pill.endDate) {
+                const durationMs = pill.endDate - pill.startDate;
+                setTimeout(async () => {
+                  await deleteDoc(newPillRef);
+                  setPills((prevPills) => prevPills.filter((p) => p.id !== newPillRef.id));
+                  Alert.alert('Aviso', `Hoy terminaste con tu medicación de ${pill.name}.`);
+                }, durationMs);
+              }
             }
           }
           Alert.alert('Éxito', 'La(s) píldora(s) se han guardado correctamente.');
         } else {
           console.warn("No se encontraron datos para el usuario.");
         }
-        router.replace('/homeScreen'); // Navega a la pantalla de inicio (home)
+        router.replace('/homeScreen');
       }
     } catch (e) {
       console.error("Error adding/updating document: ", e);
     } finally {
-      setLoading(false); // Ocultar animación de carga
+      setLoading(false);
     }
+  };
+
+  const handleEndDateSelect = (day) => {
+    const [year, month, dayOfMonth] = day.dateString.split('-').map(Number);
+    const selectedDate = new Date(year, month - 1, dayOfMonth);
+    handleInputChange(currentPillIndex, 'endDate', selectedDate.getTime());
+    setShowEndDatePicker(false);
   };
 
   return (
@@ -166,23 +185,32 @@ export default function ManagePillsScreen() {
             value={pill.name}
             onChangeText={(text) => handleInputChange(index, 'name', text)}
           />
-          <Picker
-            selectedValue={pill.interval}
-            style={styles.input}
-            onValueChange={(itemValue) => handleInputChange(index, 'interval', itemValue)}
-          >
-            <Picker.Item label="Cada 4 horas" value="4 horas" />
-            <Picker.Item label="Cada 6 horas" value="6 horas" />
-            <Picker.Item label="Cada 8 horas" value="8 horas" />
-            <Picker.Item label="Cada 12 horas" value="12 horas" />
-            <Picker.Item label="Cada 24 horas" value="24 horas" />
-          </Picker>
           <TextInput
             style={styles.input}
             placeholder="Notas"
             value={pill.notes}
             onChangeText={(text) => handleInputChange(index, 'notes', text)}
           />
+          <TouchableOpacity onPress={() => { setCurrentPillIndex(index); setShowEndDatePicker(true); }} style={styles.dateButton}>
+            <Text style={styles.dateButtonText}>
+              {pill.endDate ? `Fecha de fin: ${new Date(pill.endDate).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}` : 'Seleccionar fecha de fin'}
+            </Text>
+          </TouchableOpacity>
+          <Modal visible={showEndDatePicker} transparent={true} animationType="slide">
+            <View style={styles.modalContainer}>
+              <Calendar
+                onDayPress={handleEndDateSelect}
+                markedDates={{
+                  [pills[currentPillIndex]?.endDate ? new Date(pills[currentPillIndex].endDate).toISOString().split('T')[0] : '']: {
+                    selected: true,
+                    marked: true,
+                    selectedColor: '#00adf5'
+                  }
+                }}
+              />
+              <Button title="Cerrar" onPress={() => setShowEndDatePicker(false)} />
+            </View>
+          </Modal>
           {pill.id && (
             deletingIndex === index ? (
               <ActivityIndicator size="small" color="#ff4b4b" />
@@ -242,6 +270,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     color: '#fff',
   },
+  dateButton: {
+    backgroundColor: '#007AFF',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  dateButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   deleteButton: {
     backgroundColor: '#ff4b4b',
     padding: 10,
@@ -256,5 +295,11 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ff4b4b',
     marginBottom: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });

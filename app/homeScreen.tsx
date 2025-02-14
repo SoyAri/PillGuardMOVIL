@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, deleteDoc } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Button, Image, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
@@ -15,6 +15,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [nextMedication, setNextMedication] = useState(null);
   const [nextMedicationNotes, setNextMedicationNotes] = useState(null);
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -38,6 +40,18 @@ export default function HomeScreen() {
               const nextPill = querySnapshot.docs[0].data();
               setNextMedication(nextPill.name);
               setNextMedicationNotes(nextPill.notes || null);
+              setStartDate(nextPill.startDate);
+              setEndDate(nextPill.endDate);
+
+              // Verificar si la pastilla ha llegado a su fecha de finalización
+              if (nextPill.endDate && new Date().getTime() >= nextPill.endDate) {
+                await deleteDoc(querySnapshot.docs[0].ref);
+                setNextMedication(null);
+                setNextMedicationNotes(null);
+                setStartDate(null);
+                setEndDate(null);
+                Alert.alert('Aviso', `Hoy terminaste con tu medicación de ${nextPill.name}.`);
+              }
             } else {
               console.warn("No se encontraron pastillas.");
             }
@@ -63,8 +77,8 @@ export default function HomeScreen() {
     return 'Buenas noches';
   };
 
-  const getFormattedDate = () => {
-    const date = new Date();
+  const getFormattedDate = (timestamp) => {
+    const date = new Date(timestamp);
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     return date.toLocaleDateString('es-ES', options);
   };
@@ -83,7 +97,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>{`${getGreeting()}, ${name}!`}</Text>
-          <Text style={styles.date}>{getFormattedDate()}</Text>
+          <Text style={styles.date}>{getFormattedDate(new Date().getTime())}</Text>
         </View>
         <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settingsScreen')}>
           <Image source={require('../assets/images/settingsimg.png')} style={styles.settingsIcon} />
@@ -99,16 +113,20 @@ export default function HomeScreen() {
 
       {nextMedication && (
         <View style={styles.nextMedication}>
-          <Text style={styles.nextMedicationText}>Próxima medicación: {nextMedication}</Text>
+          <Text style={styles.nextMedicationText}>Próxima medicación: <Text style={{ fontWeight: 'bold' }}>{nextMedication}</Text></Text>
           {nextMedicationNotes && (
-            <Text style={styles.nextMedicationNotes}>Notas: {nextMedicationNotes}</Text>
+            <Text style={styles.nextMedicationNotes}>Notas: <Text style={{ fontWeight: 'bold' }}>{nextMedicationNotes}</Text></Text>
+          )}
+          {startDate && (
+            <Text style={styles.nextMedicationNotes}>Fecha de inicio: <Text style={{ fontWeight: 'bold' }}>{getFormattedDate(startDate)}</Text></Text>
+          )}
+          {endDate && (
+            <Text style={styles.nextMedicationNotes}>Fecha de fin: <Text style={{ fontWeight: 'bold' }}>{getFormattedDate(endDate)}</Text></Text>
           )}
         </View>
       )}
 
       <Text style={styles.extraText}>Última medicación: </Text>
-      <Text style={styles.extraText}>Próxima medicación: </Text>
-
       <View style={styles.addButtonContainer}>
         <Button title="Gestionar pastillas" onPress={() => router.push('/managePills')} />
       </View>
