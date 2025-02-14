@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, TextInput, View, Alert, Text, TouchableOpacity, BackHandler, Image, StatusBar } from 'react-native';
+import { StyleSheet, TextInput, View, Alert, Text, TouchableOpacity, BackHandler, Image, StatusBar, ActivityIndicator } from 'react-native';
 import { CheckBox } from 'react-native-elements';
 import { getAuth, createUserWithEmailAndPassword, sendEmailVerification, signOut, onAuthStateChanged } from "firebase/auth";
 import { app } from '../firebaseConfig'; // Ruta corregida
@@ -14,6 +14,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false); // Estado para el checkbox
+  const [loading, setLoading] = useState(false); // Estado para la animación de carga
   const router = useRouter(); // Usa el hook de navegación
 
   useEffect(() => {
@@ -70,6 +71,8 @@ export default function RegisterScreen() {
       return;
     }
 
+    setLoading(true); // Mostrar animación de carga
+
     createUserWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
         // Signed in 
@@ -112,6 +115,9 @@ export default function RegisterScreen() {
         }
         setError(errorMessage);
         console.error('Error registrando usuario:', errorCode, error.message);
+      })
+      .finally(() => {
+        setLoading(false); // Ocultar animación de carga
       });
   };
 
@@ -166,9 +172,13 @@ export default function RegisterScreen() {
         </Text>
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <TouchableOpacity style={styles.button} onPress={handleSignUp}>
-        <Text style={styles.buttonText}>Registrarse</Text>
-      </TouchableOpacity>
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" />
+      ) : (
+        <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+          <Text style={styles.buttonText}>Registrarse</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity onPress={() => router.push('/')}>
         <Text style={styles.loginText}>¿Ya tienes una cuenta? Inicia sesión</Text>
       </TouchableOpacity>

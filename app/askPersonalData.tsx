@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, TextInput, View, Text, Alert, Image, TouchableOpacity, StatusBar } from 'react-native';
+import { StyleSheet, TextInput, View, Text, Alert, Image, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
@@ -18,6 +18,7 @@ export default function AskPersonalDataScreen() {
   const [gender, setGender] = useState('Hombre');
   const [height, setHeight] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false); // Estado para la animación de carga
   const router = useRouter(); // Usa el hook de navegación
 
   const handleSave = async () => {
@@ -25,6 +26,8 @@ export default function AskPersonalDataScreen() {
       setError('Por favor, llene todos los campos.');
       return;
     }
+
+    setLoading(true); // Mostrar animación de carga
 
     const user = auth.currentUser;
     if (user) {
@@ -43,6 +46,8 @@ export default function AskPersonalDataScreen() {
       } catch (error) {
         console.error('Error guardando datos personales:', error);
         Alert.alert('Error', 'Hubo un error guardando tus datos personales.');
+      } finally {
+        setLoading(false); // Ocultar animación de carga
       }
     }
   };
@@ -134,9 +139,13 @@ export default function AskPersonalDataScreen() {
         keyboardType="numeric"
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.buttonText}>Guardar</Text>
-      </TouchableOpacity>
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" />
+      ) : (
+        <TouchableOpacity style={styles.button} onPress={handleSave}>
+          <Text style={styles.buttonText}>Guardar</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, TextInput, View, Text, Alert, TouchableOpacity, Image, StatusBar } from 'react-native';
+import { StyleSheet, TextInput, View, Text, Alert, TouchableOpacity, Image, StatusBar, ActivityIndicator } from 'react-native';
 import { getAuth, sendPasswordResetEmail, onAuthStateChanged } from "firebase/auth";
 import { app } from '../firebaseConfig'; // Ruta corregida
 import { useRouter } from 'expo-router'; // Importa el hook de navegación
@@ -10,6 +10,7 @@ const auth = getAuth(app);
 export default function ResetPasswordScreen() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false); // Estado para la animación de carga
   const router = useRouter(); // Usa el hook de navegación
 
   useEffect(() => {
@@ -32,6 +33,8 @@ export default function ResetPasswordScreen() {
       return;
     }
 
+    setLoading(true); // Mostrar animación de carga
+
     sendPasswordResetEmail(auth, email)
       .then(() => {
         Alert.alert('Correo enviado', 'Si tu correo está registrado, recibirás un enlace para restablecer tu contraseña.');
@@ -53,6 +56,9 @@ export default function ResetPasswordScreen() {
         }
         Alert.alert('Error', errorMessage);
         console.error('Error enviando correo de restablecimiento:', errorCode, error.message);
+      })
+      .finally(() => {
+        setLoading(false); // Ocultar animación de carga
       });
   };
 
@@ -72,9 +78,13 @@ export default function ResetPasswordScreen() {
         placeholderTextColor="#ccc"
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
-        <Text style={styles.buttonText}>Enviar Correo de Restablecimiento</Text>
-      </TouchableOpacity>
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" />
+      ) : (
+        <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
+          <Text style={styles.buttonText}>Enviar Correo de Restablecimiento</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

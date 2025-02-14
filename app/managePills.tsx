@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { getFirestore, collection, getDocs, updateDoc, doc, addDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
@@ -12,6 +12,8 @@ const auth = getAuth(app);
 export default function ManagePillsScreen() {
   const [pills, setPills] = useState([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false); // Estado para la animación de carga
+  const [deletingIndex, setDeletingIndex] = useState(null); // Estado para la animación de eliminación
   const router = useRouter(); // Usa el hook de navegación
 
   useEffect(() => {
@@ -63,24 +65,32 @@ export default function ManagePillsScreen() {
         {
           text: "Eliminar",
           onPress: async () => {
-            if (pillToDelete.id) {
-              const user = auth.currentUser;
-              if (user) {
-                const userId = user.uid;
-                const userDocRef = doc(db, "usersData", userId);
-                const userDocSnap = await getDoc(userDocRef);
+            setDeletingIndex(index); // Mostrar animación de eliminación
+            try {
+              if (pillToDelete.id) {
+                const user = auth.currentUser;
+                if (user) {
+                  const userId = user.uid;
+                  const userDocRef = doc(db, "usersData", userId);
+                  const userDocSnap = await getDoc(userDocRef);
 
-                if (userDocSnap.exists()) {
-                  const userData = userDocSnap.data();
-                  const userName = `${userData.name}_${userData.paternalLastname}_${userData.maternalLastname}`;
-                  const pillDocRef = doc(db, "usersPills", userName, "pills", pillToDelete.id);
-                  await deleteDoc(pillDocRef);
+                  if (userDocSnap.exists()) {
+                    const userData = userDocSnap.data();
+                    const userName = `${userData.name}_${userData.paternalLastname}_${userData.maternalLastname}`;
+                    const pillDocRef = doc(db, "usersPills", userName, "pills", pillToDelete.id);
+                    await deleteDoc(pillDocRef);
+                  }
                 }
               }
+              const newPills = pills.filter((_, i) => i !== index);
+              setPills(newPills);
+              Alert.alert('Éxito', 'La píldora se ha eliminado correctamente.');
+              router.replace('/homeScreen'); // Navega a la pantalla de inicio (home)
+            } catch (error) {
+              console.error("Error eliminando la píldora:", error);
+            } finally {
+              setDeletingIndex(null); // Ocultar animación de eliminación
             }
-            const newPills = pills.filter((_, i) => i !== index);
-            setPills(newPills);
-            router.replace('/homeScreen')
           },
           style: "destructive"
         }
@@ -96,6 +106,8 @@ export default function ManagePillsScreen() {
         return;
       }
     }
+
+    setLoading(true); // Mostrar animación de carga
 
     try {
       const user = auth.currentUser;
@@ -137,6 +149,8 @@ export default function ManagePillsScreen() {
       }
     } catch (e) {
       console.error("Error adding/updating document: ", e);
+    } finally {
+      setLoading(false); // Ocultar animación de carga
     }
   };
 
@@ -170,15 +184,23 @@ export default function ManagePillsScreen() {
             onChangeText={(text) => handleInputChange(index, 'notes', text)}
           />
           {pill.id && (
-            <TouchableOpacity onPress={() => handleDeletePill(index)} style={styles.deleteButton}>
-              <Text style={styles.deleteButtonText}>Eliminar</Text>
-            </TouchableOpacity>
+            deletingIndex === index ? (
+              <ActivityIndicator size="small" color="#ff4b4b" />
+            ) : (
+              <TouchableOpacity onPress={() => handleDeletePill(index)} style={styles.deleteButton}>
+                <Text style={styles.deleteButtonText}>Eliminar</Text>
+              </TouchableOpacity>
+            )
           )}
         </View>
       ))}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <Button title="Añadir otra pastilla" onPress={addPill} />
-      <Button title="Guardar" onPress={handleSubmit} />
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" />
+      ) : (
+        <Button title="Guardar" onPress={handleSubmit} />
+      )}
     </ScrollView>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, TextInput, View, Text, Alert, TouchableOpacity, Image, BackHandler, StatusBar } from 'react-native';
+import { StyleSheet, TextInput, View, Text, Alert, TouchableOpacity, Image, BackHandler, StatusBar, ActivityIndicator } from 'react-native';
 import { getAuth, signInWithEmailAndPassword, sendEmailVerification, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { app } from '../firebaseConfig'; // Ruta corregida
@@ -13,6 +13,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false); // Estado para la animación de carga
   const router = useRouter(); // Usa el hook de navegación
 
   // Efecto para detectar si el usuario ya está autenticado
@@ -59,6 +60,8 @@ export default function LoginScreen() {
       setError('Por favor, completa todos los campos.');
       return;
     }
+
+    setLoading(true); // Mostrar animación de carga
 
     signInWithEmailAndPassword(auth, email, password)
       .then(async (userCredential) => {
@@ -122,6 +125,9 @@ export default function LoginScreen() {
         }
         Alert.alert('Error', errorMessage);
         console.error('Error iniciando sesión:', errorCode, error.message);
+      })
+      .finally(() => {
+        setLoading(false); // Ocultar animación de carga
       });
   };
 
@@ -152,9 +158,13 @@ export default function LoginScreen() {
         placeholderTextColor="#ccc"
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Iniciar Sesión</Text>
-      </TouchableOpacity>
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" />
+      ) : (
+        <TouchableOpacity style={styles.button} onPress={handleLogin}>
+          <Text style={styles.buttonText}>Iniciar Sesión</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity onPress={() => router.push('/registro')}> {/* redirige a pantalla de registro */}
         <Text style={styles.loginText}>¿No tienes una cuenta? Regístrate</Text>
       </TouchableOpacity>
