@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, deleteDoc } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Button, Image, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Button, Image, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { app } from '../firebaseConfig';
 
