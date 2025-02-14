@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View, Alert, Text, TouchableOpacity, BackHandler, Image, StatusBar } from 'react-native';
+import { CheckBox } from 'react-native-elements';
 import { getAuth, createUserWithEmailAndPassword, sendEmailVerification, signOut, onAuthStateChanged } from "firebase/auth";
 import { app } from '../firebaseConfig'; // Ruta corregida
 import { useRouter } from 'expo-router'; // Importa el hook de navegación
@@ -12,6 +13,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false); // Estado para el checkbox
   const router = useRouter(); // Usa el hook de navegación
 
   useEffect(() => {
@@ -59,7 +61,12 @@ export default function RegisterScreen() {
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden.');
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    if (!acceptedTerms) {
+      setError('Debes aceptar los términos y condiciones.');
       return;
     }
 
@@ -103,7 +110,7 @@ export default function RegisterScreen() {
             errorMessage = 'Error al registrarse. Por favor, inténtalo de nuevo.';
             break;
         }
-        Alert.alert('Error', errorMessage);
+        setError(errorMessage);
         console.error('Error registrando usuario:', errorCode, error.message);
       });
   };
@@ -145,6 +152,19 @@ export default function RegisterScreen() {
         style={styles.input}
         placeholderTextColor="#ccc"
       />
+      <View style={styles.termsContainer}>
+        <CheckBox
+          checked={acceptedTerms}
+          onPress={() => setAcceptedTerms(!acceptedTerms)}
+          containerStyle={styles.checkboxContainer}
+        />
+        <Text style={styles.termsText}>
+          Al registrarte aceptas los{' '}
+          <Text style={styles.linkText} onPress={() => router.push('/termsAndConditions')}>
+            términos y condiciones
+          </Text>
+        </Text>
+      </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <TouchableOpacity style={styles.button} onPress={handleSignUp}>
         <Text style={styles.buttonText}>Registrarse</Text>
@@ -185,6 +205,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#333', // Cambiar el color de fondo a gris oscuro
     color: '#fff', // Cambiar el color del texto a blanco
+  },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  checkboxContainer: {
+    margin: 0,
+    padding: 0,
+  },
+  termsText: {
+    color: '#fff',
+    marginLeft: 8,
+  },
+  linkText: {
+    color: '#007AFF',
+    textDecorationLine: 'underline',
   },
   errorText: {
     color: '#ff4b4b',

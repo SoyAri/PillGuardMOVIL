@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Button, TextInput, View, Text, Alert, Image, TouchableOpacity, StatusBar } from 'react-native';
+import { StyleSheet, TextInput, View, Text, Alert, Image, TouchableOpacity, StatusBar } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
@@ -12,7 +12,8 @@ const db = getFirestore(app);
 
 export default function AskPersonalDataScreen() {
   const [name, setName] = useState('');
-  const [lastname, setLastname] = useState('');
+  const [paternalLastname, setPaternalLastname] = useState('');
+  const [maternalLastname, setMaternalLastname] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('Hombre');
   const [height, setHeight] = useState('');
@@ -20,7 +21,7 @@ export default function AskPersonalDataScreen() {
   const router = useRouter(); // Usa el hook de navegación
 
   const handleSave = async () => {
-    if (!name || !lastname || !age || !height) {
+    if (!name || !paternalLastname || !maternalLastname || !age || !height) {
       setError('Por favor, llene todos los campos.');
       return;
     }
@@ -31,7 +32,8 @@ export default function AskPersonalDataScreen() {
       try {
         await setDoc(doc(db, "usersData", userId), {
           name,
-          lastname,
+          paternalLastname,
+          maternalLastname,
           age,
           gender,
           height,
@@ -77,11 +79,22 @@ export default function AskPersonalDataScreen() {
         placeholderTextColor="#ccc"
       />
       <TextInput
-        placeholder="Apellidos"
-        value={lastname}
+        placeholder="Apellido Paterno"
+        value={paternalLastname}
         onChangeText={(text) => {
           if (validateName(text)) {
-            setLastname(text);
+            setPaternalLastname(text);
+          }
+        }}
+        style={styles.input}
+        placeholderTextColor="#ccc"
+      />
+      <TextInput
+        placeholder="Apellido Materno"
+        value={maternalLastname}
+        onChangeText={(text) => {
+          if (validateName(text)) {
+            setMaternalLastname(text);
           }
         }}
         style={styles.input}

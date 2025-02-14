@@ -37,6 +37,7 @@ export default function RootLayout() {
         <Stack.Screen name="askPersonalData" options={{ headerShown: false }} />
         <Stack.Screen name="homeScreen" options={{ headerShown: false }} />
         <Stack.Screen name="recoverPassword" options={{ headerShown: true }} />
+        <Stack.Screen name="termsAndConditions" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

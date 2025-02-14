@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Image, SafeAreaView, StatusBar, Platform, Button } from 'react-native';
+import { useRouter } from 'expo-router';
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, collection, query, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore";
-import { app } from '../firebaseConfig'; // Ruta corregida
-import { useRouter } from 'expo-router'; // Importa el hook de navegación
+import { collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query } from "firebase/firestore";
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Button, Image, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Calendar } from 'react-native-calendars';
+import { app } from '../firebaseConfig';
 
 // Initialize Firebase Auth and Firestore
 const auth = getAuth(app);
@@ -14,35 +15,34 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [nextMedication, setNextMedication] = useState(null);
   const [nextMedicationNotes, setNextMedicationNotes] = useState(null);
-  const router = useRouter(); // Usa el hook de navegación
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        console.log("Usuario autenticado:", user.uid); // Verifica si el UID se obtiene correctamente
+        console.log("Usuario autenticado:", user.uid);
         try {
-          // Obtener el nombre del usuario
           const userDocRef = doc(db, "usersData", user.uid);
           const userDocSnap = await getDoc(userDocRef);
 
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
             setName(userData.name || "Usuario sin nombre");
+
+            const userName = `${userData.name}_${userData.paternalLastname}_${userData.maternalLastname}`;
+            const pillsRef = collection(db, "usersPills", userName, "pills");
+            const q = query(pillsRef, orderBy("timestamp"), limit(1));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+              const nextPill = querySnapshot.docs[0].data();
+              setNextMedication(nextPill.name);
+              setNextMedicationNotes(nextPill.notes || null);
+            } else {
+              console.warn("No se encontraron pastillas.");
+            }
           } else {
             console.warn("No se encontraron datos para el usuario.");
-          }
-
-          // Obtener la próxima medicación
-          const pillsRef = collection(db, "usersPills", user.uid, "pills");
-          const q = query(pillsRef, orderBy("timestamp"), limit(1));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            const nextPill = querySnapshot.docs[0].data();
-            setNextMedication(nextPill.name); // Solo guarda el nombre de la próxima pastilla
-            setNextMedicationNotes(nextPill.notes || null); // Guarda la nota de la próxima pastilla si existe
-          } else {
-            console.warn("No se encontraron pastillas.");
           }
         } catch (error) {
           console.error("Error obteniendo los datos del usuario:", error);
@@ -53,7 +53,7 @@ export default function HomeScreen() {
       setLoading(false);
     });
 
-    return () => unsubscribe(); // Limpieza al desmontar
+    return () => unsubscribe();
   }, []);
 
   const getGreeting = () => {
@@ -89,6 +89,14 @@ export default function HomeScreen() {
           <Image source={require('../assets/images/settingsimg.png')} style={styles.settingsIcon} />
         </TouchableOpacity>
       </View>
+
+      <Calendar
+        style={styles.calendar}
+        markedDates={{
+          '2024-12-29': {selected: true, marked: true, selectedColor: '#00adf5'},
+        }}
+      />
+
       {nextMedication && (
         <View style={styles.nextMedication}>
           <Text style={styles.nextMedicationText}>Próxima medicación: {nextMedication}</Text>
@@ -97,6 +105,10 @@ export default function HomeScreen() {
           )}
         </View>
       )}
+
+      <Text style={styles.extraText}>Última medicación: </Text>
+      <Text style={styles.extraText}>Próxima medicación: </Text>
+
       <View style={styles.addButtonContainer}>
         <Button title="Gestionar pastillas" onPress={() => router.push('/managePills')} />
       </View>
@@ -109,7 +121,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     backgroundColor: '#212c39',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 16, // Ajusta según el sistema
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 16,
   },
   header: {
     flexDirection: 'row',
@@ -140,6 +152,9 @@ const styles = StyleSheet.create({
     height: 24,
     tintColor: '#fff',
   },
+  calendar: {
+    marginBottom: 20,
+  },
   nextMedication: {
     marginTop: 20,
     padding: 10,
@@ -155,8 +170,13 @@ const styles = StyleSheet.create({
     color: '#ccc',
     marginTop: 5,
   },
+  extraText: {
+    fontSize: 16,
+    color: '#ccc',
+    marginTop: 10,
+  },
   addButtonContainer: {
-    marginTop: 'auto', // Mueve el botón al final de la pantalla
-    marginBottom: 20, // Añade un margen inferior
+    marginTop: 'auto',
+    marginBottom: 20,
   },
 });

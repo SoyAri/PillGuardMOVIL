@@ -19,11 +19,20 @@ export default function ManagePillsScreen() {
       const user = auth.currentUser;
       if (user) {
         const userId = user.uid;
-        const pillsRef = collection(db, "usersPills", userId, "pills");
-        const querySnapshot = await getDocs(pillsRef);
-        const pillsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        pillsData.sort((a, b) => a.order - b.order); // Ordenar por el campo 'order'
-        setPills(pillsData);
+        const userDocRef = doc(db, "usersData", userId);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          const userName = `${userData.name}_${userData.paternalLastname}_${userData.maternalLastname}`;
+          const pillsRef = collection(db, "usersPills", userName, "pills");
+          const querySnapshot = await getDocs(pillsRef);
+          const pillsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          pillsData.sort((a, b) => a.order - b.order); // Ordenar por el campo 'order'
+          setPills(pillsData);
+        } else {
+          console.warn("No se encontraron datos para el usuario.");
+        }
       }
     };
 
@@ -58,8 +67,15 @@ export default function ManagePillsScreen() {
               const user = auth.currentUser;
               if (user) {
                 const userId = user.uid;
-                const pillDocRef = doc(db, "usersPills", userId, "pills", pillToDelete.id);
-                await deleteDoc(pillDocRef);
+                const userDocRef = doc(db, "usersData", userId);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (userDocSnap.exists()) {
+                  const userData = userDocSnap.data();
+                  const userName = `${userData.name}_${userData.paternalLastname}_${userData.maternalLastname}`;
+                  const pillDocRef = doc(db, "usersPills", userName, "pills", pillToDelete.id);
+                  await deleteDoc(pillDocRef);
+                }
               }
             }
             const newPills = pills.filter((_, i) => i !== index);
@@ -90,31 +106,30 @@ export default function ManagePillsScreen() {
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
-          const userName = userData.name || "Usuario sin nombre";
+          const userName = `${userData.name}_${userData.paternalLastname}_${userData.maternalLastname}`;
 
           for (const pill of pills) {
             if (pill.id) {
               // Update existing pill
-              const pillDocRef = doc(db, "usersPills", userId, "pills", pill.id);
+              const pillDocRef = doc(db, "usersPills", userName, "pills", pill.id);
               await updateDoc(pillDocRef, {
                 name: pill.name,
                 interval: pill.interval,
                 notes: pill.notes,
-                userName: userName,
                 order: pill.order
               });
             } else {
               // Add new pill
-              await addDoc(collection(db, "usersPills", userId, "pills"), {
+              await addDoc(collection(db, "usersPills", userName, "pills"), {
                 name: pill.name,
                 interval: pill.interval,
                 notes: pill.notes,
                 timestamp: new Date().getTime(), // Añadir timestamp para la próxima medicación
-                userName: userName,
                 order: pill.order
               });
             }
           }
+          Alert.alert('Éxito', 'La(s) píldora(s) se han guardado correctamente.');
         } else {
           console.warn("No se encontraron datos para el usuario.");
         }
