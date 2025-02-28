@@ -4,6 +4,7 @@ import { getAuth, signInWithEmailAndPassword, sendEmailVerification, onAuthState
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { app } from '../firebaseConfig'; // Ruta corregida
 import { useRouter } from 'expo-router'; // Importa el hook de navegación
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Importa AsyncStorage
 
 // Initialize Firebase Auth
 const auth = getAuth(app);
@@ -18,9 +19,34 @@ export default function LoginScreen() {
 
   // Efecto para detectar si el usuario ya está autenticado
   useEffect(() => {
+    const checkUserSession = async () => {
+      const userSession = await AsyncStorage.getItem('userSession');
+      if (userSession) {
+        const user = JSON.parse(userSession);
+        if (user && user.emailVerified) {
+          // Usuario autenticado y correo verificado, verifica si tiene datos personales
+          const userId = user.uid;
+          const docRef = doc(db, "usersData", userId);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            // Usuario tiene datos personales, redirige a HomeScreen
+            router.replace('/homeScreen');
+          } else {
+            // Usuario no tiene datos personales, redirige a askPersonalData
+            router.replace('/askPersonalData');
+          }
+        }
+      }
+    };
+
+    checkUserSession();
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user && user.emailVerified) {
-        // Usuario autenticado y correo verificado, verifica si tiene datos personales
+        // Usuario autenticado y correo verificado, guarda la sesión en AsyncStorage
+        await AsyncStorage.setItem('userSession', JSON.stringify(user));
+        // Verifica si tiene datos personales
         const userId = user.uid;
         const docRef = doc(db, "usersData", userId);
         const docSnap = await getDoc(docRef);
@@ -70,6 +96,8 @@ export default function LoginScreen() {
         const userId = user.uid;
 
         if (user.emailVerified) {
+          // Guarda la sesión en AsyncStorage
+          await AsyncStorage.setItem('userSession', JSON.stringify(user));
           // Check if user has personal data
           const docRef = doc(db, "usersData", userId);
           const docSnap = await getDoc(docRef);
