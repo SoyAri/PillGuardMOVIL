@@ -50,6 +50,9 @@ export default function HomeScreen() {
     "Aquí aparecerán comentarios y sugerencias generados por la IA."
   );
   const router = useRouter();
+  const today = new Date();
+  const localDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()); // Elimina la diferencia horaria
+  const formattedDate = localDate.toISOString().split('T')[0];
 
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(50);
@@ -241,7 +244,7 @@ export default function HomeScreen() {
             textDayHeaderFontSize: 16 // Tamaño de la fuente del texto del encabezado del día
           }}
           markedDates={{
-            [new Date().toISOString().split('T')[0]]: { selected: true, marked: true, selectedColor: '#007AFF' }, // Marcar el día actual
+            [formattedDate]: { selected: true, marked: true, selectedColor: '#007AFF' },
           }}
         />
 
