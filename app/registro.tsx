@@ -1,102 +1,132 @@
+// Importaciones y configuración de Firebase, navegación y React Native
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router'; // Hook para la navegación entre pantallas
+import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, sendEmailVerification, signOut } from "firebase/auth";
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, TextInput, View, Alert, Text, TouchableOpacity, BackHandler, Image, StatusBar, ActivityIndicator } from 'react-native';
-import { CheckBox } from 'react-native-elements';
-import { getAuth, createUserWithEmailAndPassword, sendEmailVerification, signOut, onAuthStateChanged } from "firebase/auth";
-import { app } from '../firebaseConfig'; // Ruta corregida
-import { useRouter } from 'expo-router'; // Importa el hook de navegación
+import { Alert, BackHandler, Image, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
+import { app } from '../firebaseConfig'; // Configuración de Firebase
 
-// Initialize Firebase Auth
+// Inicialización de Firebase Auth
 const auth = getAuth(app);
 
 export default function RegisterScreen() {
+  // Estados para almacenar correo, contraseña, confirmación de contraseña y mensajes de error
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const [acceptedTerms, setAcceptedTerms] = useState(false); // Estado para el checkbox
-  const [loading, setLoading] = useState(false); // Estado para la animación de carga
-  const router = useRouter(); // Usa el hook de navegación
+  const router = useRouter(); // Hook para cambiar de pantallas
+  const [tema, setTema] = useState("Temabase");
+  // NUEVOS estados para efectos visuales:
+  const [isProtanopia, setIsProtanopia] = useState(false);
+  const [isDeuteranopia, setIsDeuteranopia] = useState(false);
+  const [isTritanopia, setIsTritanopia] = useState(false);
+  const [isMonochromatic, setIsMonochromatic] = useState(false);
+  const [isDaltonism, setIsDaltonism] = useState(false);
 
+  // Efecto para escuchar los cambios en el estado de autenticación de Firebase
   useEffect(() => {
+    // Si el usuario está autenticado y su correo fue verificado, redirige a la pantalla principal
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && user.emailVerified) {
-        // User is signed in and email is verified, redirect to home screen
-        router.replace('/homeScreen');
+        router.replace('/homeScreen'); // Redirección
       }
     });
-
-    // Cleanup subscription on unmount
+    // Limpieza del efecto al desmontar el componente
     return () => unsubscribe();
   }, [router]);
 
+  // Efecto para deshabilitar el botón físico "atrás" en Android y evitar regresar a la pantalla de registro
   useEffect(() => {
     const backAction = () => {
-      // Evitar que el usuario regrese a la pantalla de registro
-      return true;
+      return true; // Impide la acción de retroceso
     };
-
-    const backHandler = BackHandler.addEventListener(
-      "hardwareBackPress",
-      backAction
-    );
-
-    return () => backHandler.remove();
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
+    return () => backHandler.remove(); // Limpieza del listener
   }, []);
 
+  // Cargar tema desde AsyncStorage
+  useEffect(() => {
+    const loadTheme = async () => {
+      const temaGuardado = await AsyncStorage.getItem('tema');
+      if (temaGuardado) setTema(temaGuardado);
+    };
+    loadTheme();
+  }, []);
+
+  // NUEVO useEffect para cargar efectos visuales desde AsyncStorage
+  useEffect(() => {
+    const loadVisualEffects = async () => {
+      const protanopiaGuardado = await AsyncStorage.getItem('protanopia');
+      if (protanopiaGuardado !== null) setIsProtanopia(protanopiaGuardado === 'true');
+      const deuteranopiaGuardado = await AsyncStorage.getItem('deuteranopia');
+      if (deuteranopiaGuardado !== null) setIsDeuteranopia(deuteranopiaGuardado === 'true');
+      const tritanopiaGuardado = await AsyncStorage.getItem('tritanopia');
+      if (tritanopiaGuardado !== null) setIsTritanopia(tritanopiaGuardado === 'true');
+      const monochromaticGuardado = await AsyncStorage.getItem('monochromatic');
+      if (monochromaticGuardado !== null) setIsMonochromatic(monochromaticGuardado === 'true');
+      const daltonismGuardado = await AsyncStorage.getItem('daltonism');
+      if (daltonismGuardado !== null) setIsDaltonism(daltonismGuardado === 'true');
+    };
+    loadVisualEffects();
+  }, []);
+
+  // Función para validar el formato del correo mediante una expresión regular
   const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Expresión para correo válido
     return emailRegex.test(email);
   };
 
+  // Función que gestiona el registro del usuario
   const handleSignUp = () => {
-    setError(''); // Limpiar el mensaje de error al intentar registrarse nuevamente
+    setError(''); // Reinicia el mensaje de error
 
+    // Validación de campos vacíos
     if (!email || !password || !confirmPassword) {
       setError('Por favor, completa todos los campos.');
       return;
     }
 
+    // Validación del formato de correo
     if (!validateEmail(email)) {
       setError('Por favor, ingresa un correo electrónico válido.');
       return;
     }
 
+    // Validación de que las contraseñas coincidan
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.');
+      Alert.alert('Error', 'Las contraseñas no coinciden.');
       return;
     }
 
-    if (!acceptedTerms) {
-      setError('Debes aceptar los términos y condiciones.');
-      return;
-    }
-
-    setLoading(true); // Mostrar animación de carga
-
+    // Se intenta crear el usuario con el correo y contraseña proporcionados
     createUserWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
-        // Signed in 
+        // Registro exitoso del usuario
         const user = userCredential.user;
         console.log('User registered:', user);
 
-        // Send verification email
+        // Se envía el correo de verificación
         sendEmailVerification(user)
           .then(() => {
             console.log('Verification email sent.');
             Alert.alert('Correo de verificación enviado', 'Por favor, revisa tu correo para verificar tu cuenta.');
-            // Sign out the user to prevent access until email is verified
-            signOut(auth).then(() => {
-              console.log('User signed out to prevent access until email is verified.');
-              router.replace('/'); // Redirige a la pantalla de inicio de sesión
-            }).catch((error) => {
-              console.error('Error signing out user:', error);
-            });
+            // Se cierra la sesión para evitar acceso sin verificación y se redirige a la pantalla de inicio de sesión
+            signOut(auth)
+              .then(() => {
+                console.log('User signed out to prevent access until email is verified.');
+                router.replace('/');
+              })
+              .catch((error) => {
+                console.error('Error signing out user:', error);
+              });
           })
           .catch((error) => {
             console.error('Error sending verification email:', error);
           });
       })
       .catch((error) => {
+        // Manejo de errores durante el proceso de registro
         const errorCode = error.code;
         let errorMessage = '';
         switch (errorCode) {
@@ -113,132 +143,105 @@ export default function RegisterScreen() {
             errorMessage = 'Error al registrarse. Por favor, inténtalo de nuevo.';
             break;
         }
-        setError(errorMessage);
+        Alert.alert('Error', errorMessage);
         console.error('Error registrando usuario:', errorCode, error.message);
-      })
-      .finally(() => {
-        setLoading(false); // Ocultar animación de carga
       });
   };
 
+  // Renderizado de la interfaz de registro
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <Image source={require('../assets/images/registerimg.png')} style={styles.image} />
-      <Text style={styles.title}>Registro</Text>
+    <SafeAreaView style={[
+      styles.container,
+      tema === 'claro' ? styles.claro : styles.base,
+      isProtanopia ? styles.protanopia : null,
+      isDeuteranopia ? styles.deuteranopia : null,
+      isTritanopia ? styles.tritanopia : null,
+      isMonochromatic ? styles.monochromatic : null,
+      isDaltonism ? styles.daltonism : null,
+    ]}>
+      <StatusBar barStyle="light-content" /> {/* Estado de la barra superior */}
+      <Image source={require('../assets/images/registerimg.png')} style={styles.image} /> {/* Imagen ilustrativa */}
+      <Text style={styles.title}>Registro</Text> {/* Título de la pantalla */}
       <TextInput
-        placeholder="Correo"
+        placeholder="Correo" // Entrada para el correo electrónico
         value={email}
         onChangeText={(text) => {
           setEmail(text);
-          setError(''); // Limpiar el mensaje de error al cambiar el texto
+          setError(''); // Reinicia el error al cambiar el texto
         }}
         style={styles.input}
         placeholderTextColor="#ccc"
       />
       <TextInput
-        placeholder="Contraseña"
+        placeholder="Contraseña" // Entrada para la contraseña
         value={password}
         onChangeText={(text) => {
           setPassword(text);
-          setError(''); // Limpiar el mensaje de error al cambiar el texto
+          setError('');
         }}
         secureTextEntry
         style={styles.input}
         placeholderTextColor="#ccc"
       />
       <TextInput
-        placeholder="Confirma tu contraseña"
+        placeholder="Confirma tu contraseña" // Entrada para confirmar contraseña
         value={confirmPassword}
         onChangeText={(text) => {
           setConfirmPassword(text);
-          setError(''); // Limpiar el mensaje de error al cambiar el texto
+          setError('');
         }}
         secureTextEntry
         style={styles.input}
         placeholderTextColor="#ccc"
       />
-      <View style={styles.termsContainer}>
-        <CheckBox
-          checked={acceptedTerms}
-          onPress={() => setAcceptedTerms(!acceptedTerms)}
-          containerStyle={styles.checkboxContainer}
-        />
-        <Text style={styles.termsText}>
-          Al registrarte aceptas los{' '}
-          <Text style={styles.linkText} onPress={() => router.push('/termsAndConditions')}>
-            términos y condiciones
-          </Text>
-        </Text>
-      </View>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" />
-      ) : (
-        <TouchableOpacity style={styles.button} onPress={handleSignUp}>
-          <Text style={styles.buttonText}>Registrarse</Text>
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity onPress={() => router.push('/')}>
-        <Text style={styles.loginText}>¿Ya tienes una cuenta? Inicia sesión</Text>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null} {/* Muestra errores si existen */}
+      <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+        <Text style={styles.buttonText}>Registrarse</Text> {/* Botón para ejecutar registro */}
       </TouchableOpacity>
-    </View>
+      <TouchableOpacity onPress={() => router.push('/')}>
+        <Text style={styles.loginText}>¿Ya tienes una cuenta? Inicia sesión</Text> {/* Enlace a la pantalla de inicio de sesión */}
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
+// Definición de estilos para la interfaz
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#212c39',
+    backgroundColor: '#212c39', // Fondo oscuro
   },
   image: {
     width: 200,
     height: 200,
-    marginBottom: 16,
+    marginBottom: 16, // Espacio debajo de la imagen
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 16, // Reducir el margen inferior para subir el contenido
-    color: '#fff',
+    marginBottom: 16, // Espacio debajo del título
+    color: '#fff', // Texto en blanco
   },
   input: {
     height: 40,
-    borderColor: '#555', // Cambiar el color del borde a gris oscuro
+    borderColor: '#555', // Borde gris oscuro
     borderWidth: 1,
     marginBottom: 12,
     paddingHorizontal: 8,
     width: '100%',
     borderRadius: 8,
-    backgroundColor: '#333', // Cambiar el color de fondo a gris oscuro
-    color: '#fff', // Cambiar el color del texto a blanco
-  },
-  termsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  checkboxContainer: {
-    margin: 0,
-    padding: 0,
-  },
-  termsText: {
-    color: '#fff',
-    marginLeft: 8,
-  },
-  linkText: {
-    color: '#007AFF',
-    textDecorationLine: 'underline',
+    backgroundColor: '#333', // Fondo oscuro para los campos
+    color: '#fff', // Texto en blanco
   },
   errorText: {
-    color: '#ff4b4b',
+    color: '#ff4b4b', // Texto en rojo para errores
     marginBottom: 12,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#007AFF', // Botón azul
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -247,13 +250,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: '#fff',
+    color: '#fff', // Texto del botón en blanco
     fontSize: 16,
     fontWeight: 'bold',
   },
   loginText: {
     marginTop: 16,
-    color: '#007AFF',
+    color: '#007AFF', // Enlace en azul
     textDecorationLine: 'underline',
+  },
+  base: {
+    backgroundColor: '#2a3b4c',
+  },
+  claro: {
+    backgroundColor: '#FFFFFF',
+  },
+  // NUEVOS estilos para efectos visuales:
+  protanopia: {
+    filter: 'protanopia(100%)', // Simula efecto Protanopia
+  },
+  deuteranopia: {
+    filter: 'deuteranopia(100%)', // Simula efecto Deuteranopia
+  },
+  tritanopia: {
+    filter: 'tritanopia(100%)', // Simula efecto Tritanopia
+  },
+  monochromatic: {
+    filter: 'grayscale(100%)', // Simula vista Monochromatic
+  },
+  daltonism: {
+    filter: 'daltonism(100%)', // Simula efecto Daltonismo
   },
 });

@@ -1,208 +1,390 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, TextInput, View, Text, Alert, TouchableOpacity, Image, BackHandler, StatusBar, ActivityIndicator } from 'react-native';
-import { getAuth, signInWithEmailAndPassword, sendEmailVerification, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { app } from '../firebaseConfig'; // Ruta corregida
-import { useRouter } from 'expo-router'; // Importa el hook de navegación
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Importa AsyncStorage
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Notifications from 'expo-notifications';
+import { useRouter } from 'expo-router';
+import * as TaskManager from 'expo-task-manager';
+import { getAuth, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc, getFirestore, updateDoc } from "firebase/firestore";
+import React, { useEffect, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Alert, BackHandler, Image, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { app } from '../firebaseConfig';
 
-// Initialize Firebase Auth
+// Paso 1: Definir el manejador de notificaciones que fija la forma en como se muestran en la app
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,   // Se mostrará alerta en la notificación
+    shouldPlaySound: true,   // Se reproducirá sonido en la notificación
+    shouldSetBadge: false,   // No se actualizará el badge de la app
+  }),
+});
+
+// Inicialización de Firebase (autenticación y conexión a Firestore)
 const auth = getAuth(app);
-const db = getFirestore(app); // Initialize Firestore
+const db = getFirestore(app);
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false); // Estado para la animación de carga
-  const router = useRouter(); // Usa el hook de navegación
+  // Estados para almacenar valores de email, contraseña, errores, carga, tema y notificaciones.
+  const [email, setEmail] = useState(''); // Valor del correo electrónico
+  const [error, setError] = useState(''); // Mensaje de error a mostrar
+  const [password, setPassword] = useState(''); // Valor de la contraseña
+  const [loading, setLoading] = useState(false); // Indicador de carga al iniciar sesión
+  const [tema, setTema] = useState("Temabase"); // Estado de tema (por defecto "Temabase")
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false); // Estado para notificaciones habilitadas
+  const router = useRouter(); // Hook para navegación entre pantallas
 
-  // Efecto para detectar si el usuario ya está autenticado
+  // NUEVOS estados para efectos visuales:
+  const [isProtanopia, setIsProtanopia] = useState(false);
+  const [isDeuteranopia, setIsDeuteranopia] = useState(false);
+  const [isTritanopia, setIsTritanopia] = useState(false);
+  const [isMonochromatic, setIsMonochromatic] = useState(false);
+  const [isDaltonism, setIsDaltonism] = useState(false);
+
+  // Nuevo estado para verificar si ya se guardó el token
+  const [tokenExists, setTokenExists] = useState(false);
+
+  // useEffect para cargar configuraciones: tema y estado de las notificaciones desde AsyncStorage
   useEffect(() => {
-    const checkUserSession = async () => {
-      const userSession = await AsyncStorage.getItem('userSession');
-      if (userSession) {
-        const user = JSON.parse(userSession);
-        if (user && user.emailVerified) {
-          // Usuario autenticado y correo verificado, verifica si tiene datos personales
-          const userId = user.uid;
-          const docRef = doc(db, "usersData", userId);
-          const docSnap = await getDoc(docRef);
+    const loadConfig = async () => {
+      try {
+        // Recupera el tema guardado y el estado de notificaciones desde el almacenamiento
+        const temaGuardado = await AsyncStorage.getItem('tema');
+        const notificationsStatus = await AsyncStorage.getItem('notificationsEnabled');
+        if (temaGuardado) setTema(temaGuardado);
+        if (notificationsStatus) setNotificationsEnabled(JSON.parse(notificationsStatus));
+      } catch (error) {
+        console.error("Error cargando configuraciones:", error);
+      }
+    };
+    loadConfig();
+  }, []);
 
-          if (docSnap.exists()) {
-            // Usuario tiene datos personales, redirige a HomeScreen
-            router.replace('/homeScreen');
+  useEffect(() => {
+    const loadVisualEffects = async () => {
+      const protanopiaGuardado = await AsyncStorage.getItem('protanopia');
+      if (protanopiaGuardado !== null) setIsProtanopia(protanopiaGuardado === 'true');
+      const deuteranopiaGuardado = await AsyncStorage.getItem('deuteranopia');
+      if (deuteranopiaGuardado !== null) setIsDeuteranopia(deuteranopiaGuardado === 'true');
+      const tritanopiaGuardado = await AsyncStorage.getItem('tritanopia');
+      if (tritanopiaGuardado !== null) setIsTritanopia(tritanopiaGuardado === 'true');
+      const monochromaticGuardado = await AsyncStorage.getItem('monochromatic');
+      if (monochromaticGuardado !== null) setIsMonochromatic(monochromaticGuardado === 'true');
+      const daltonismGuardado = await AsyncStorage.getItem('daltonism');
+      if (daltonismGuardado !== null) setIsDaltonism(daltonismGuardado === 'true');
+    };
+    loadVisualEffects();
+  }, []);
+
+  // Nuevo useEffect para consultar la existencia del token
+  useEffect(() => {
+    const checkToken = async () => {
+      const token = await AsyncStorage.getItem('notificationToken');
+      setTokenExists(!!token);
+    };
+    checkToken();
+  }, []);
+
+  // useEffect: Configurar y activar notificaciones si el usuario ha habilitado la opción
+  useEffect(() => {
+    // Paso 2: Si las notificaciones están habilitadas en la configuración del usuario
+    const enableNotifications = async () => {
+      try {
+        if (notificationsEnabled) {
+          // Paso 3: Solicitar permisos de notificaciones
+          const { status } = await Notifications.requestPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permiso denegado', 'No se pueden enviar notificaciones sin permisos.');
+            return;
+          }
+          // Buscar token ya almacenado o crearlo y guardarlo en AsyncStorage
+          let token = await AsyncStorage.getItem('notificationToken');
+          if (!token) {
+            token = (await Notifications.getExpoPushTokenAsync()).data;
+            await AsyncStorage.setItem('notificationToken', token);
+          }
+          await AsyncStorage.setItem('notificationsEnabled', JSON.stringify(notificationsEnabled));
+          // Vincular el token a la cuenta si existe usuario autenticado
+          if (auth.currentUser) {
+            const userId = auth.currentUser.uid;
+            const userRef = doc(db, "usersData", userId);
+            await updateDoc(userRef, { notificationToken: token });
+            console.log('Notification token associated with user:', token);
           } else {
-            // Usuario no tiene datos personales, redirige a askPersonalData
-            router.replace('/askPersonalData');
+            console.warn("No authenticated user to store notification token");
           }
         }
+      } catch (error) {
+        console.error("Error configurando notificaciones:", error);
+      }
+    };
+    enableNotifications();
+  }, [notificationsEnabled]);
+
+  // useEffect: Solicitar permisos adicionales de notificaciones para Android y iOS (redundante, pero refuerza la solicitud)
+  useEffect(() => {
+    // Paso 5: Pedir permisos de notificaciones explícitamente según la plataforma
+    const requestNotificationPermissions = async () => {
+      if (Platform.OS === 'android') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permiso denegado', 'No se pueden enviar notificaciones sin permisos.');
+        }
+      } else if (Platform.OS === 'ios') {
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+          },
+        });
+        if (status !== 'granted') {
+          Alert.alert('Permiso denegado', 'No se pueden enviar notificaciones sin permisos.');
+        }
+      }
+    };
+
+    // Paso 6: Ejecutar la petición de permisos
+    requestNotificationPermissions();
+  }, []);
+
+  // useEffect para verificar y restaurar la sesión del usuario ya sea del AsyncStorage o de Firebase Auth
+  useEffect(() => {
+    const checkUserSession = async () => {
+      try {
+        // Intenta recuperar una sesión guardada del usuario
+        const userSession = await AsyncStorage.getItem('userSession');
+        if (userSession) {
+          const parsedUser = JSON.parse(userSession);
+          console.log('Sesión encontrada:', parsedUser);
+
+          if (parsedUser.emailVerified) {
+            // Verifica si existen datos adicionales del usuario en Firestore
+            const userId = parsedUser.uid;
+            const docRef = doc(db, "usersData", userId);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+              // Si existen, navega a la pantalla principal
+              router.replace('/homeScreen');
+            } else {
+              // Si faltan datos, navega a la pantalla para solicitar información personal
+              router.replace('/askPersonalData');
+            }
+            return;
+          }
+        }
+
+        // Si no hay sesión almacenada, se subscribe a los cambios de estado de Firebase Auth
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user && user.emailVerified) {
+            console.log('Usuario autenticado desde Firebase:', user);
+            const userSession = {
+              uid: user.uid,
+              email: user.email,
+              emailVerified: user.emailVerified
+            };
+            await AsyncStorage.setItem('userSession', JSON.stringify(userSession));
+            
+            const docRef = doc(db, "usersData", user.uid);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+              router.replace('/homeScreen');
+            } else {
+              router.replace('/askPersonalData');
+            }
+          }
+        });
+
+        return () => unsubscribe(); // Limpia el listener al desmontar el componente
+      } catch (error) {
+        console.error('Error verificando la sesión del usuario:', error);
       }
     };
 
     checkUserSession();
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user && user.emailVerified) {
-        // Usuario autenticado y correo verificado, guarda la sesión en AsyncStorage
-        await AsyncStorage.setItem('userSession', JSON.stringify(user));
-        // Verifica si tiene datos personales
-        const userId = user.uid;
-        const docRef = doc(db, "usersData", userId);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          // Usuario tiene datos personales, redirige a HomeScreen
-          router.replace('/homeScreen');
-        } else {
-          // Usuario no tiene datos personales, redirige a askPersonalData
-          router.replace('/askPersonalData');
-        }
-      }
-    });
-
-    // Limpia el observador cuando el componente se desmonta
-    return () => unsubscribe();
   }, [router]);
 
+  // useEffect para deshabilitar el botón físico de regresar en dispositivos Android y evitar volver a la pantalla de login
   useEffect(() => {
-    const backAction = () => {
-      // Evitar que el usuario regrese a la pantalla de inicio de sesión
-      return true;
-    };
-
-    const backHandler = BackHandler.addEventListener(
-      "hardwareBackPress",
-      backAction
-    );
-
+    const backAction = () => true;
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
     return () => backHandler.remove();
   }, []);
 
-  const handleLogin = () => {
-    setError(''); // Limpiar el mensaje de error al intentar iniciar sesión nuevamente
+  // Función para manejar el inicio de sesión del usuario, validando entradas y navegando según el resultado
+  const handleLogin = async () => {
+    setLoading(true);
+    try {
+      // Validación de que los campos email y contraseña estén completos
+      if (!email || !password) {
+        Alert.alert('Error', 'Por favor, completa todos los campos.');
+        return;
+      }
 
-    if (!email || !password) {
-      setError('Por favor, completa todos los campos.');
-      return;
+      // Realiza la autenticación mediante Firebase usando email y contraseña
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      if (user.emailVerified) {
+        // Obtiene datos adicionales del usuario de Firestore si existen
+        const docRef = doc(db, "usersData", user.uid);
+        const docSnap = await getDoc(docRef);
+        const sessionUser = docSnap.exists()
+          ? { uid: user.uid, email: user.email, emailVerified: user.emailVerified, name: docSnap.data().name || "" }
+          : { uid: user.uid, email: user.email, emailVerified: user.emailVerified };
+
+        await AsyncStorage.setItem('userSession', JSON.stringify(sessionUser));
+        // Navega a la pantalla correcta en función de la existencia de datos adicionales
+        docSnap.exists() ? router.replace('/homeScreen') : router.replace('/askPersonalData');
+      } else {
+        // Si el correo no está verificado, muestra un mensaje y ofrece enviar el correo de verificación
+        Alert.alert(
+          'Verificación pendiente',
+          'Tu correo electrónico no ha sido verificado. ¿Quieres que enviemos un correo de verificación?',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Enviar', onPress: () => sendEmailVerification(user) }
+          ]
+        );
+      }
+    } catch (error) {
+      // Manejo de errores de autenticación con mensajes específicos para cada código de error
+      const errorCode = (error as any).code;
+      let errorMessage = 'Correo o contraseña incorrectos.';
+      if (errorCode === 'auth/wrong-password') errorMessage = 'Contraseña incorrecta.';
+      if (errorCode === 'auth/user-not-found') errorMessage = 'No se encontró ninguna cuenta con esas credenciales.';
+      Alert.alert('Error', errorMessage);
+      console.error("Error en login:", error);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setLoading(true); // Mostrar animación de carga
+  // Función que activa la accesibilidad TalkBack, solicitando al usuario abrir la configuración de accesibilidad si no está activada
+  const handleTalkbackActivation = () => {
+    AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {
+      if (!enabled) {
+        Alert.alert(
+          'Activar TalkBack',
+          'TalkBack no está activado. Por favor, abre el apartado de accesibilidad.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Abrir configuración',
+              onPress: () => {
+                if (Platform.OS === 'ios') {
+                  Alert.alert('Opción no disponible', 'No se puede abrir en iOS.');
+                } else {
+                  IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.ACCESSIBILITY_SETTINGS);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('TalkBack ya está activado.');
+      }
+    });
+  };
 
-    signInWithEmailAndPassword(auth, email, password)
-      .then(async (userCredential) => {
-        // Signed in
-        const user = userCredential.user;
-        const userId = user.uid;
-
-        if (user.emailVerified) {
-          // Guarda la sesión en AsyncStorage
-          await AsyncStorage.setItem('userSession', JSON.stringify(user));
-          // Check if user has personal data
-          const docRef = doc(db, "usersData", userId);
-          const docSnap = await getDoc(docRef);
-
-          if (docSnap.exists()) {
-            // User has personal data, navigate to home screen
-            router.replace('/homeScreen'); // Navega a la pantalla de inicio (home)
-          } else {
-            // User does not have personal data, navigate to askpersonaldata screen
-            router.replace('/askPersonalData'); // Navega a la pantalla de datos personales
-          }
-        } else {
-          Alert.alert(
-            'Verificación pendiente',
-            'Tu correo electrónico no ha sido verificado. ¿Quieres que te enviemos otro correo de verificación?',
-            [
-              {
-                text: 'Cancelar',
-                style: 'cancel',
-              },
-              {
-                text: 'Enviar',
-                onPress: () => {
-                  sendEmailVerification(user)
-                    .then(() => {
-                      Alert.alert('Correo de verificación enviado', 'Por favor, revisa tu correo para verificar tu cuenta.');
-                    })
-                    .catch((error) => {
-                      console.error('Error enviando correo de verificación:', error);
-                    });
-                },
-              },
-            ]
-          );
-        }
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        let errorMessage = '';
-        switch (errorCode) {
-          case 'auth/wrong-password':
-            errorMessage = 'Correo o contraseña incorrectos.';
-            break;
-          case 'auth/user-not-found':
-            errorMessage = 'No se encontró ninguna cuenta con esas credenciales.';
-            break;
-          case 'auth/invalid-email':
-            errorMessage = 'Correo o contraseña incorrectos.';
-            break;
-          default:
-            errorMessage = 'Correo o contraseña incorrectos.';
-            break;
-        }
-        Alert.alert('Error', errorMessage);
-        console.error('Error iniciando sesión:', errorCode, error.message);
-      })
-      .finally(() => {
-        setLoading(false); // Ocultar animación de carga
-      });
+  // Función para cerrar sesión: cierra sesión en Firebase y limpia los datos almacenados localmente
+  const handleLogout = async () => {
+    try {
+      // Desvincular el token de la cuenta del usuario (sin eliminarlo de AsyncStorage)
+      if (auth.currentUser) {
+        const userRef = doc(db, "usersData", auth.currentUser.uid);
+        await updateDoc(userRef, { notificationToken: null });
+      }
+      await auth.signOut();
+      await AsyncStorage.removeItem('userSession');
+      // No se elimina el token de notificaciones, se mantiene en AsyncStorage.
+      await TaskManager.unregisterAllTasksAsync(); // Cancela todas las tareas en segundo plano
+      await AsyncStorage.setItem('notificationsEnabled', 'false'); // Deshabilita notificaciones al cerrar sesión
+      router.replace('/');
+    } catch (error) {
+      console.error('Error cerrando sesión:', error);
+    }
   };
 
   return (
-    <View style={styles.container}>
+    // Contenedor principal con estilos condicionados según el tema (claro o base)
+    <SafeAreaView style={[
+      styles.container,
+      tema === "claro" ? styles.claro : styles.base,
+      isProtanopia ? styles.protanopia : null,
+      isDeuteranopia ? styles.deuteranopia : null,
+      isTritanopia ? styles.tritanopia : null,
+      isMonochromatic ? styles.monochromatic : null,
+      isDaltonism ? styles.daltonism : null,
+    ]}>
+      {/* Sección superior: Botón para activar TalkBack y explicación */}
+      <View style={styles.talkbackContainer}>
+        <TouchableOpacity style={styles.talkbackButton} onPress={handleTalkbackActivation}>
+          <Image source={require('../assets/images/settingsimg.png')} style={styles.settingsIcon} />
+        </TouchableOpacity>
+        <Text style={styles.talkbackText}>Activar TalkBack</Text>
+      </View>
       <StatusBar barStyle="light-content" />
       <Image source={require('../assets/images/splash.png')} style={styles.logo} />
-      <Text style={styles.title}>Iniciar Sesión</Text>
+      <Text style={[styles.title, tema === "claro" ? styles.textColorBlack : {}]}>Iniciar Sesión</Text>
+      {/* Campo de entrada para el correo electrónico */}
       <TextInput
         placeholder="Correo"
         value={email}
         onChangeText={(text) => {
           setEmail(text);
-          setError(''); // Limpiar el mensaje de error al cambiar el texto
+          setError('');
         }}
-        style={styles.input}
+        style={[styles.input, tema === "claro" ? styles.inputClaro : styles.input]}
         placeholderTextColor="#ccc"
       />
+      {/* Campo de entrada para la contraseña */}
       <TextInput
         placeholder="Contraseña"
         value={password}
         onChangeText={(text) => {
           setPassword(text);
-          setError(''); // Limpiar el mensaje de error al cambiar el texto
+          setError('');
         }}
         secureTextEntry
-        style={styles.input}
+        style={[styles.input, tema === "claro" ? styles.inputClaro : styles.input]}
         placeholderTextColor="#ccc"
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {loading ? (
+        // Indicador visual mientras se procesa la solicitud de inicio de sesión
         <ActivityIndicator size="large" color="#007AFF" />
       ) : (
         <TouchableOpacity style={styles.button} onPress={handleLogin}>
           <Text style={styles.buttonText}>Iniciar Sesión</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity onPress={() => router.push('/registro')}> {/* redirige a pantalla de registro */}
+      {/* Enlaces para registrarse o recuperar contraseña */}
+      <TouchableOpacity onPress={() => router.push('/registro')}>
         <Text style={styles.loginText}>¿No tienes una cuenta? Regístrate</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push('/recoverPassword')}> {/* redirige a pantalla de restablecimiento de contraseña */}
+      <TouchableOpacity onPress={() => router.push('/recoverPassword')}>
         <Text style={styles.loginText}>¿Olvidaste tu contraseña? Restablécela</Text>
       </TouchableOpacity>
-    </View>
+      {/* Sección que pregunta si desea recibir notificaciones, en caso de no estar habilitadas */}
+      {!notificationsEnabled && !tokenExists && (
+        <View style={styles.notificationContainer}>
+          <Text style={styles.notificationText}>¿Deseas recibir notificaciones?</Text>
+          <TouchableOpacity
+            style={[
+              styles.notificationButton,
+              notificationsEnabled ? styles.notificationButtonEnabled : styles.notificationButtonDisabled
+            ]}
+            onPress={() => setNotificationsEnabled(true)}
+          >
+            <Text style={styles.notificationButtonText}>{notificationsEnabled ? 'Sí' : 'No'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
+// Estilos para los componentes de la pantalla de inicio de sesión
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -212,9 +394,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#212c39',
   },
   logo: {
-    width: 200, // Aumentar el tamaño del logo
-    height: 200, // Aumentar el tamaño del logo
-    marginBottom: 16, // Reducir el margen inferior para subir el contenido
+    width: 200,
+    height: 200,
+    marginBottom: 16,
   },
   title: {
     fontSize: 32,
@@ -228,14 +410,19 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 40,
-    borderColor: '#555', // Cambiar el color del borde a gris oscuro
+    borderColor: '#555',
     borderWidth: 1,
     marginBottom: 12,
     paddingHorizontal: 8,
     width: '100%',
     borderRadius: 8,
-    backgroundColor: '#333', // Cambiar el color de fondo a gris oscuro
-    color: '#fff', // Cambiar el color del texto a blanco
+    backgroundColor: '#333',
+    color: '#fff',
+  },
+  inputClaro: {
+    backgroundColor: '#fff',
+    color: '#000',
+    borderColor: '#ccc',
   },
   button: {
     backgroundColor: '#007AFF',
@@ -255,5 +442,79 @@ const styles = StyleSheet.create({
     marginTop: 16,
     color: '#007AFF',
     textDecorationLine: 'underline',
+  },
+  base: {
+    backgroundColor: "#2a3b4c",
+  },
+  claro: {
+    backgroundColor: "#FFFFFF",
+  },
+  textColorBlack: {
+    color: '#000',
+  },
+  notificationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  notificationText: {
+    color: '#fff',
+    marginRight: 8,
+  },
+  notificationButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  notificationButtonEnabled: {
+    backgroundColor: '#4CAF50',
+  },
+  notificationButtonDisabled: {
+    backgroundColor: '#FF0000',
+  },
+  notificationButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  talkbackContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 10,
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  talkbackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  talkbackText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#fff',
+  },
+  settingsIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#fff',
+  },
+  // NUEVOS estilos para efectos visuales:
+  protanopia: {
+    filter: 'protanopia(100%)', // Simula efecto Protanopia
+  },
+  deuteranopia: {
+    filter: 'deuteranopia(100%)', // Simula efecto Deuteranopia
+  },
+  tritanopia: {
+    filter: 'tritanopia(100%)', // Simula efecto Tritanopia
+  },
+  monochromatic: {
+    filter: 'grayscale(100%)', // Simula vista Monochromatic
+  },
+  daltonism: {
+    filter: 'daltonism(100%)', // Simula efecto Daltonismo
   },
 });

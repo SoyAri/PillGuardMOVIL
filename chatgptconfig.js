@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuración de la API de OpenAI
 const openai = new OpenAI({
-  apiKey: 'APIKEY', 
+  apiKey: 'ASD', 
 });
 
 const fetchAiComment = async () => {

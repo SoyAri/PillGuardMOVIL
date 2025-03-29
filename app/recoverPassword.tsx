@@ -1,46 +1,81 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, TextInput, View, Text, Alert, TouchableOpacity, Image, StatusBar, ActivityIndicator } from 'react-native';
-import { getAuth, sendPasswordResetEmail, onAuthStateChanged } from "firebase/auth";
-import { app } from '../firebaseConfig'; // Ruta corregida
-import { useRouter } from 'expo-router'; // Importa el hook de navegación
+// Componente ResetPasswordScreen: Pantalla para restablecer la contraseña mediante correo electrónico.
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router'; // Importa el hook para navegación
+import { getAuth, onAuthStateChanged, sendPasswordResetEmail } from "firebase/auth"; // Importa funciones de Firebase Auth
+import React, { useEffect, useState } from 'react'; // Importa React y hooks
+import { Alert, Image, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native'; // Importa componentes nativos
+import { app } from '../firebaseConfig'; // Importa la configuración de Firebase
 
-// Initialize Firebase Auth
+// Inicializa la autenticación de Firebase
 const auth = getAuth(app);
 
 export default function ResetPasswordScreen() {
+  // Define estados para almacenar el correo y cualquier mensaje de error
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false); // Estado para la animación de carga
-  const router = useRouter(); // Usa el hook de navegación
+  const [tema, setTema] = useState("Temabase");
+  // NUEVOS estados para efectos visuales:
+  const [isProtanopia, setIsProtanopia] = useState(false);
+  const [isDeuteranopia, setIsDeuteranopia] = useState(false);
+  const [isTritanopia, setIsTritanopia] = useState(false);
+  const [isMonochromatic, setIsMonochromatic] = useState(false);
+  const [isDaltonism, setIsDaltonism] = useState(false);
+  // Inicializa el hook de navegación para redirecciones de pantalla
+  const router = useRouter(); 
 
+  // useEffect: Observa el estado de autenticación y redirige si el usuario ya está autenticado
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // Si el usuario ya está autenticado, redirigir a la pantalla de inicio
+        // Redirige a la pantalla principal si el usuario está autenticado
         router.replace('/homeScreen');
       }
     });
 
-    // Limpia el observador cuando el componente se desmonta
+    // Limpia el observador al desmontar el componente
     return () => unsubscribe();
   }, [router]);
 
+  useEffect(() => {
+    // ...existing theme loading code...
+  }, []);
+
+  // NUEVO useEffect para cargar efectos visuales desde AsyncStorage
+  useEffect(() => {
+    async function loadVisualEffects() {
+      const protanopiaGuardado = await AsyncStorage.getItem('protanopia');
+      if (protanopiaGuardado !== null) setIsProtanopia(protanopiaGuardado === 'true');
+      const deuteranopiaGuardado = await AsyncStorage.getItem('deuteranopia');
+      if (deuteranopiaGuardado !== null) setIsDeuteranopia(deuteranopiaGuardado === 'true');
+      const tritanopiaGuardado = await AsyncStorage.getItem('tritanopia');
+      if (tritanopiaGuardado !== null) setIsTritanopia(tritanopiaGuardado === 'true');
+      const monochromaticGuardado = await AsyncStorage.getItem('monochromatic');
+      if (monochromaticGuardado !== null) setIsMonochromatic(monochromaticGuardado === 'true');
+      const daltonismGuardado = await AsyncStorage.getItem('daltonism');
+      if (daltonismGuardado !== null) setIsDaltonism(daltonismGuardado === 'true');
+    }
+    loadVisualEffects();
+  }, []);
+
+  // Maneja el proceso de restablecimiento de la contraseña
   const handleResetPassword = () => {
-    setError(''); // Limpiar el mensaje de error al intentar restablecer la contraseña
+    setError(''); // Limpia mensajes de error anteriores
 
     if (!email) {
+      // Valida que el campo de correo no esté vacío
       setError('Por favor, ingresa tu correo electrónico.');
       return;
     }
 
-    setLoading(true); // Mostrar animación de carga
-
+    // Envía el correo de restablecimiento utilizando Firebase Auth
     sendPasswordResetEmail(auth, email)
       .then(() => {
+        // Notifica con alerta que el correo fue enviado y redirige a inicio
         Alert.alert('Correo enviado', 'Si tu correo está registrado, recibirás un enlace para restablecer tu contraseña.');
-        router.replace('/'); // Redirige a la pantalla de inicio de sesión
+        router.replace('/');
       })
       .catch((error) => {
+        // Maneja errores específicos y muestra un mensaje acorde
         const errorCode = error.code;
         let errorMessage = '';
         switch (errorCode) {
@@ -54,88 +89,120 @@ export default function ResetPasswordScreen() {
             errorMessage = 'Error al enviar el correo de restablecimiento. Por favor, inténtalo de nuevo.';
             break;
         }
+        // Muestra alerta del error y registra el error en consola
         Alert.alert('Error', errorMessage);
         console.error('Error enviando correo de restablecimiento:', errorCode, error.message);
-      })
-      .finally(() => {
-        setLoading(false); // Ocultar animación de carga
       });
   };
 
+  // Retorno del componente que renderiza la interfaz de usuario
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[
+      styles.container,
+      tema === 'claro' ? styles.claro : styles.base,
+      isProtanopia ? styles.protanopia : null,
+      isDeuteranopia ? styles.deuteranopia : null,
+      isTritanopia ? styles.tritanopia : null,
+      isMonochromatic ? styles.monochromatic : null,
+      isDaltonism ? styles.daltonism : null,
+    ]}>
+      {/* Configura la barra de estado con estilo claro */}
       <StatusBar barStyle="light-content" />
+      {/* Muestra una imagen representativa para el restablecimiento de contraseña */}
       <Image source={require('../assets/images/recoverpswdimg.png')} style={styles.image} />
+      {/* Muestra el título de la pantalla */}
       <Text style={styles.title}>Restablecer Contraseña</Text>
+      {/* Campo de entrada para el correo electrónico */}
       <TextInput
         placeholder="Correo"
         value={email}
         onChangeText={(text) => {
-          setEmail(text);
-          setError(''); // Limpiar el mensaje de error al cambiar el texto
+          setEmail(text); // Actualiza el estado con el texto ingresado
+          setError(''); // Reinicia el mensaje de error
         }}
         style={styles.input}
         placeholderTextColor="#ccc"
       />
+      {/* Muestra el mensaje de error si existe */}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" />
-      ) : (
-        <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
-          <Text style={styles.buttonText}>Enviar Correo de Restablecimiento</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+      {/* Botón que ejecuta el proceso de reseteo al presionarlo */}
+      <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
+        <Text style={styles.buttonText}>Enviar Correo de Restablecimiento</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
+// Definición de estilos para la interfaz del componente
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', // Centra verticalmente el contenido
+    alignItems: 'center', // Centra horizontalmente el contenido
     padding: 16,
-    paddingTop: 10, // Añadir margen superior para subir el contenido
-    backgroundColor: '#212c39',
+    paddingTop: 10, // Agrega margen superior para el contenido
+    backgroundColor: '#212c39', // Color de fondo principal
   },
   image: {
     width: 200,
     height: 200,
-    marginBottom: 8, // Reducir el margen inferior para subir el contenido
+    marginBottom: 8, // Espacio inferior para separar la imagen del contenido siguiente
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 24,
-    color: '#fff',
+    marginBottom: 24, // Espacio inferior para separar el título del resto
+    color: '#fff', // Color blanco para el título
   },
   input: {
     height: 40,
-    borderColor: '#555', // Cambiar el color del borde a gris oscuro
+    borderColor: '#555', // Color gris oscuro para el borde
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 12, // Espacio inferior entre el campo y otros elementos
     paddingHorizontal: 8,
     width: '100%',
     borderRadius: 8,
-    backgroundColor: '#333', // Cambiar el color de fondo a gris oscuro
-    color: '#fff', // Cambiar el color del texto a blanco
+    backgroundColor: '#333', // Color de fondo del campo de texto
+    color: '#fff', // Color del texto ingresado
   },
   errorText: {
-    color: '#ff4b4b',
+    color: '#ff4b4b', // Color rojo para errores
     marginBottom: 12,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#007AFF', // Color del botón
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
-    marginTop: 10,
+    marginTop: 10, // Espacio superior para separar el botón del campo de texto
     width: '100%',
-    alignItems: 'center',
+    alignItems: 'center', // Centra el texto dentro del botón
   },
   buttonText: {
-    color: '#fff',
+    color: '#fff', // Color blanco para el texto del botón
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  base: {
+    // ...existing code...
+  },
+  claro: {
+    // ...existing code...
+  },
+  // NUEVOS estilos para efectos visuales:
+  protanopia: {
+    filter: 'protanopia(100%)', // Simula efecto Protanopia
+  },
+  deuteranopia: {
+    filter: 'deuteranopia(100%)', // Simula efecto Deuteranopia
+  },
+  tritanopia: {
+    filter: 'tritanopia(100%)', // Simula efecto Tritanopia
+  },
+  monochromatic: {
+    filter: 'grayscale(100%)', // Simula vista Monochromatic
+  },
+  daltonism: {
+    filter: 'daltonism(100%)', // Simula efecto Daltonismo
   },
 });
