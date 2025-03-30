@@ -28,6 +28,7 @@
     "expo-background-fetch": "~13.0.5",
     "expo-blur": "~14.0.3",
     "expo-constants": "~17.0.5",
+    "expo-env": "^1.1.1",
     "expo-font": "~13.0.3",
     "expo-haptics": "~14.0.1",
     "expo-intent-launcher": "^12.0.2",
