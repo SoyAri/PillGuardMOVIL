@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 
 // Configuración de la API de OpenAI
 const openai = new OpenAI({
-  apiKey: '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', 
+  apiKey: 'APIKEY', 
 });
 
 const fetchAiComment = async () => {
