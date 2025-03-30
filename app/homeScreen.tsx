@@ -28,7 +28,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated"; // Manejo de animaciones
-import { fetchAiComment } from "../reisconfig"; // Función para obtener comentarios generados por IA
+import { fetchAiComment } from "../assistantconfig"; // Función para obtener comentarios generados por IA
 import { app } from "../firebaseConfig"; // Inicialización de Firebase
 import { scheduleNotification } from "../notificationUtils"; // Función para programar notificaciones
 
