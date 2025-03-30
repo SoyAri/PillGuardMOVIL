@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuración de la API de OpenAI
 const openai = new OpenAI({
-  apiKey: 'ASD', 
+  apiKey: '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', 
 });
 
 const fetchAiComment = async () => {
@@ -42,6 +42,6 @@ const getCachedAiComment = async () => {
     console.error("Error getting cached AI comment:", error);
     return "Error getting cached AI comment.";
   }
-};
+};  
 
 export { fetchAiComment, getCachedAiComment };
