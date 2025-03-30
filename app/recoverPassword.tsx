@@ -129,6 +129,12 @@ export default function ResetPasswordScreen() {
       <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
         <Text style={styles.buttonText}>Enviar Correo de Restablecimiento</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+                style={styles.homeButton}
+                onPress={() => router.push('/')}
+              >
+                <Text style={styles.homeButtonText}>Regresar a inicio</Text>
+              </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -205,4 +211,17 @@ const styles = StyleSheet.create({
   daltonism: {
     filter: 'daltonism(100%)', // Simula efecto Daltonismo
   },
+  homeButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginLeft: 10,
+    marginTop: 20,
+  },
+  homeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  }
 });

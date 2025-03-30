@@ -327,6 +327,12 @@ export default function SettingsScreen({ navigation }) {
       <TouchableOpacity style={styles.closeButton} onPress={closeSettings}>
         <Text style={styles.closeButtonText}>Cerrar sesión</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+          style={styles.homeButton}
+          onPress={() => router.push('/homeScreen')}
+        >
+          <Text style={styles.homeButtonText}>Regresar a inicio</Text>
+        </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -457,5 +463,19 @@ const styles = StyleSheet.create({
   noEffectPreview: {
     backgroundColor: "#ccc", // Color de previsualización para sin efecto
   },
+  homeButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 50,
+    alignItems: 'center',
+    marginLeft: 10,
+    marginTop: 20,
+    
+  },
+  homeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  }
 });
 

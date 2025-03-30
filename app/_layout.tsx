@@ -49,11 +49,13 @@ export default function RootLayout() {
         {/* Pantalla principal de la app (homeScreen) sin barra de encabezado */}
         <Stack.Screen name="homeScreen" options={{ headerShown: false }} />
         {/* Pantalla para recuperar la contraseña con barra de encabezado */}
-        <Stack.Screen name="recoverPassword" options={{ headerShown: true }} />
+        <Stack.Screen name="recoverPassword" options={{ headerShown: false }} />
         {/* Pantalla de términos y condiciones sin barra de encabezado */}
         <Stack.Screen name="termsAndConditions" options={{ headerShown: false }} />
         {/* Pantalla para gestionar medicinas sin barra de encabezado */}
         <Stack.Screen name="managePills" options={{ headerShown: false }} />
+        {/* Pantalla de configuración sin barra de encabezado */}
+        <Stack.Screen name="settingsScreen" options={{ headerShown: false }} />
         {/* Pantalla de error para rutas no encontradas */}
         <Stack.Screen name="+not-found" />
       </Stack>

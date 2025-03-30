@@ -39,9 +39,6 @@ export default function LoginScreen() {
   const [isMonochromatic, setIsMonochromatic] = useState(false);
   const [isDaltonism, setIsDaltonism] = useState(false);
 
-  // Nuevo estado para verificar si ya se guardó el token
-  const [tokenExists, setTokenExists] = useState(false);
-
   // useEffect para cargar configuraciones: tema y estado de las notificaciones desde AsyncStorage
   useEffect(() => {
     const loadConfig = async () => {
@@ -74,15 +71,6 @@ export default function LoginScreen() {
     loadVisualEffects();
   }, []);
 
-  // Nuevo useEffect para consultar la existencia del token
-  useEffect(() => {
-    const checkToken = async () => {
-      const token = await AsyncStorage.getItem('notificationToken');
-      setTokenExists(!!token);
-    };
-    checkToken();
-  }, []);
-
   // useEffect: Configurar y activar notificaciones si el usuario ha habilitado la opción
   useEffect(() => {
     // Paso 2: Si las notificaciones están habilitadas en la configuración del usuario
@@ -95,19 +83,15 @@ export default function LoginScreen() {
             Alert.alert('Permiso denegado', 'No se pueden enviar notificaciones sin permisos.');
             return;
           }
-          // Buscar token ya almacenado o crearlo y guardarlo en AsyncStorage
-          let token = await AsyncStorage.getItem('notificationToken');
-          if (!token) {
-            token = (await Notifications.getExpoPushTokenAsync()).data;
-            await AsyncStorage.setItem('notificationToken', token);
-          }
+          // Paso 4: Obtener el token push para las notificaciones
+          const token = (await Notifications.getExpoPushTokenAsync()).data;
           await AsyncStorage.setItem('notificationsEnabled', JSON.stringify(notificationsEnabled));
-          // Vincular el token a la cuenta si existe usuario autenticado
+          // Almacenar el token en la base de datos del usuario dentro del área de authentication
           if (auth.currentUser) {
             const userId = auth.currentUser.uid;
             const userRef = doc(db, "usersData", userId);
             await updateDoc(userRef, { notificationToken: token });
-            console.log('Notification token associated with user:', token);
+            console.log('Notification token stored in DB for user:', token);
           } else {
             console.warn("No authenticated user to store notification token");
           }
@@ -289,14 +273,9 @@ export default function LoginScreen() {
   // Función para cerrar sesión: cierra sesión en Firebase y limpia los datos almacenados localmente
   const handleLogout = async () => {
     try {
-      // Desvincular el token de la cuenta del usuario (sin eliminarlo de AsyncStorage)
-      if (auth.currentUser) {
-        const userRef = doc(db, "usersData", auth.currentUser.uid);
-        await updateDoc(userRef, { notificationToken: null });
-      }
       await auth.signOut();
       await AsyncStorage.removeItem('userSession');
-      // No se elimina el token de notificaciones, se mantiene en AsyncStorage.
+      await AsyncStorage.removeItem('notificationToken');
       await TaskManager.unregisterAllTasksAsync(); // Cancela todas las tareas en segundo plano
       await AsyncStorage.setItem('notificationsEnabled', 'false'); // Deshabilita notificaciones al cerrar sesión
       router.replace('/');
@@ -366,7 +345,7 @@ export default function LoginScreen() {
         <Text style={styles.loginText}>¿Olvidaste tu contraseña? Restablécela</Text>
       </TouchableOpacity>
       {/* Sección que pregunta si desea recibir notificaciones, en caso de no estar habilitadas */}
-      {!notificationsEnabled && !tokenExists && (
+      {!notificationsEnabled && (
         <View style={styles.notificationContainer}>
           <Text style={styles.notificationText}>¿Deseas recibir notificaciones?</Text>
           <TouchableOpacity

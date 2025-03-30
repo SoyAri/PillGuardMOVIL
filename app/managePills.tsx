@@ -2,6 +2,7 @@
 // Incluye manejo de AsyncStorage, operaciones con Firebase y UI para edición, guardado y eliminación de pastillas.
 
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Manejo de almacenamiento local
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router'; // Navegación entre pantallas
 import { getAuth } from "firebase/auth"; // Autenticación Firebase
 import { addDoc, collection, deleteDoc, doc, getDocs, getFirestore, updateDoc } from "firebase/firestore"; // Operaciones con Firestore
@@ -9,6 +10,7 @@ import React, { useEffect, useState } from 'react'; // Manejo de estado y efecto
 import { ActivityIndicator, Alert, Button, Modal, Platform, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars'; // Calendario para selección de fecha
 import { app } from '../firebaseConfig'; // Configuración Firebase
+
 
 const db = getFirestore(app);
 const auth = getAuth(app);

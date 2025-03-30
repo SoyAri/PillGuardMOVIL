@@ -2,7 +2,7 @@
 
 # dependencies
 node_modules/
-chatgptconfig.js
+assistantconfig.js
 
 # Expo
 .expo/
@@ -31,7 +31,6 @@ yarn-error.*
 *.pem
 
 # local env files
-.env
 .env*.local
 
 # typescript
